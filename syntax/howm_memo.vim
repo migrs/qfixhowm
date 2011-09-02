@@ -2,7 +2,7 @@
 "
 " Language:howm
 " Maintainer:fuenor@gmail.com
-" Last Change:2011-03-18 00:04
+" Last Change:2011-06-06 21:52
 
 if &background == 'dark'
   hi howmTodo     ctermfg=Yellow      guifg=Yellow
@@ -20,10 +20,10 @@ endif
 hi howmDeadline ctermfg=Red     guifg=Red
 hi howmHoliday  ctermfg=Magenta guifg=Magenta
 hi howmSpecial  ctermfg=Red     guifg=Red
-hi def link howmNormal Normal
+hi link howmNormal Normal
 
-hi def link actionlockDate Underlined
-hi def link actionlockTime Constant
+hi link actionlockDate Underlined
+hi link actionlockTime Constant
 
 if exists('g:QFixHowm_Date')
   exec 'syntax match actionlockDate contained "'.g:QFixHowm_Date.'" '
@@ -37,7 +37,7 @@ if exists('g:QFixHowm_Date')
   let s:pattern = '\['.g:QFixHowm_Date.'\( \d\{2}:\d\{2}\)\?]'
 endif
 let s:epat = '\{1,3}\((\([0-9]\+\)\?\([-+*]\?\c\(\(Sun\|Mon\|Tue\|Wed\|Thu\|Fri\|Sat\|Hdy\)\?\([-+]\d\+\)\?\)\?\))\)\?\d*'
-exe 'syntax match howmNormal      "^'.s:pattern.'" contains=ALLBUT,howmCategory'
+exe 'syntax match howmNormal   "^'   .s:pattern.'"               contains=actionlockDate,actionlockTime'
 exe 'syntax match howmSchedule "^\s*'.s:pattern.'@' . s:epat .'" contains=actionlockDate,actionlockTime'
 exe 'syntax match howmDeadline "^\s*'.s:pattern.'!' . s:epat .'" contains=actionlockDate,actionlockTime'
 exe 'syntax match howmTodo     "^\s*'.s:pattern.'+' . s:epat .'" contains=actionlockDate,actionlockTime'
@@ -50,26 +50,26 @@ if exists('g:QFixHowm_Date')
 endif
 exe 'syntax match howmFinished "'.s:pattern.'"'
 
-hi def link txtUrl  Underlined
-hi def link txtFile Underlined
+syntax match howmUrl  "\(howm\|rel\|https\|http\|ftp\|file\):[-0-9a-zA-Z;/?:@&=+$,_.!~*'()%#]\+"
+syntax match howmTxt '\([A-Za-z]:[/\\]\|\~\/\)[-0-9a-zA-Z;/?:@&=+$,_.!~*'()%{}[\]\\]\+'
 
-syntax match txtUrl  "\(howm\|rel\|https\|http\|ftp\|file\):[-0-9a-zA-Z;/?:@&=+$,_.!~*'()%]\+"
-syntax match txtFile '\([A-Za-z]:[/\\]\|\~\/\)[-0-9a-zA-Z;/?:@&=+$,_.!~*'()%{}[\]\\]\+'
+syntax match howmUrl  '\[:\?&\?\zs\(howm\|rel\|https\|http\|ftp\|file\)://[^:]\+\ze:[^\]]*]'
+syntax match howmTxt '\[:\?&\?\zs\([A-Za-z]:[/\\]\|\~\/\)[^:]\+\ze:[^\]]*]'
 
-syntax match txtFile '\[:\?&\?\zs\([A-Za-z]:[/\\]\|\~\/\)[^:]\+\ze:[^\]]*]'
-syntax match txtUrl  '\[:\?&\?\zs\(howm\|rel\|https\|http\|ftp\|file\)://[^:]\+\ze:[^\]]*]'
+hi link howmUrl  Underlined
+hi link howmTxt  Underlined
 
-hi def link outlineTitle                Type
-hi def link actionlockLink              Underlined
-hi def link actionlockKeyword           Underlined
-hi def link actionlockMacroAction       Underlined
-hi def link actionlockMacroActionDefine howmFinished
-hi def link actionlockList              Type
-hi def link recentmodeDate              howmFinished
-hi def link howmTitle                   Title
-hi def link howmTitleDesc               Special
-hi def link howmCategory                Label
-hi def link howmEntrySeparator          Special
+hi link outlineTitle                Type
+hi link actionlockLink              Underlined
+hi link actionlockKeyword           Underlined
+hi link actionlockMacroAction       Underlined
+hi link actionlockMacroActionDefine howmFinished
+hi link actionlockList              Type
+hi link recentmodeDate              howmFinished
+hi link howmTitle                   Title
+hi link howmTitleDesc               Special
+hi link howmCategory                Label
+hi link howmEntrySeparator          Special
 
 if exists('g:QFixHowm_Title') && exists('g:QFixHowm_EscapeTitle')
   let s:QFixHowm_Title = escape(g:QFixHowm_Title, g:QFixHowm_EscapeTitle)

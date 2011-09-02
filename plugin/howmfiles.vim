@@ -1,8 +1,8 @@
 "=============================================================================
 "    Description: HowmTitlelist for QFixHowm
 "         Author: fuenor <fuenor@gmail.com>
-"  Last Modified: 2011-03-08 18:38
-"        Version: 1.06
+"  Last Modified: 2011-06-26 11:34
+"        Version: 1.07
 "=============================================================================
 scriptencoding utf-8
 
@@ -27,11 +27,23 @@ endif
 if !exists('g:QFixHowm_MenuCloseOnJump')
   let g:QFixHowm_MenuCloseOnJump = 1
 endif
+if !exists('g:QFixHowm_ListCloseOnJump')
+  let g:QFixHowm_ListCloseOnJump = 0
+endif
 if !exists('g:QFixHowm_MenuHeight')
   let g:QFixHowm_MenuHeight = 0
 endif
+if !exists('g:QFixHowm_MenuWidth')
+  let g:QFixHowm_MenuWidth = 0
+endif
+if !exists('g:QFixHowm_MenuWrap')
+  let g:QFixHowm_MenuWrap = 0
+endif
 if !exists('g:QFixHowm_MenuPreview')
-  let g:QFixHowm_MenuPreview = 1
+  let g:QFixHowm_MenuPreview = 0
+endif
+if !exists('g:QFixHowm_MenuCmd')
+  let g:QFixHowm_MenuCmd = ''
 endif
 if !exists('g:HowmFiles_Preview')
   let g:HowmFiles_Preview = 1
@@ -46,15 +58,17 @@ let s:filehead = 'howm://'
 augroup HowmFiles
   au!
   autocmd BufWinEnter __Howm_Files__ call <SID>BufWinEnter(g:QFix_PreviewEnable)
-  " autocmd BufEnter    __Howm_Files__ set winfixheight
+  autocmd BufEnter    __Howm_Files__ call <SID>BufEnter()
   autocmd BufLeave    __Howm_Files__ call <SID>BufLeave()
   autocmd CursorHold  __Howm_Files__ call <SID>Preview()
 
   autocmd BufWinEnter __HOWM_MENU__ call <SID>BufWinEnterMenu(g:HowmFiles_Preview, s:filehead)
-  " autocmd BufEnter    __HOWM_MENU__ set winfixheight
   autocmd BufLeave    __HOWM_MENU__ call <SID>BufLeaveMenu()
   autocmd CursorHold  __HOWM_MENU__ call <SID>PreviewMenu(s:filehead)
 augroup END
+
+function! s:BufEnter()
+endfunction
 
 function! s:BufWinEnter(preview)
   setlocal winfixheight
@@ -72,6 +86,7 @@ function! s:BufWinEnter(preview)
   nnoremap <buffer> <silent> R :call <SID>Exec('delete','Remove')<CR>
   vnoremap <buffer> <silent> D :call <SID>Exec('delete','Delete')<CR>
   vnoremap <buffer> <silent> R :call <SID>Exec('delete','Remove')<CR>
+  nnoremap <buffer> <silent> @ :call <SID>CmdAT()<CR>
   nnoremap <buffer> <silent> S :<C-u>call <SID>SortExec()<CR>
   nnoremap <buffer> <silent> s :<C-u>call <SID>Search('g!')<CR>
   nnoremap <buffer> <silent> r :<C-u>call <SID>Search('g')<CR>
@@ -80,6 +95,7 @@ function! s:BufWinEnter(preview)
   nnoremap <buffer> <silent> p :<C-u>call <SID>Exec('put')<CR>
   nnoremap <buffer> <silent> P :<C-u>call <SID>Exec('put!')<CR>
   nnoremap <buffer> <silent> u :<C-u>call <SID>Exec('undo')<CR>
+  nnoremap <buffer> <silent> J :<C-u>call <SID>ListCmd_J()<CR>
   nnoremap <buffer> <silent> <C-r> :<C-u>call <SID>Exec("redo")<CR>
 
   nnoremap <buffer> <silent> A :HowmFilesWriteResult<CR>
@@ -99,8 +115,12 @@ function! s:BufWinEnter(preview)
   silent exec 'lchdir ' . escape(g:howm_dir, ' ')
 endfunction
 
+function! s:ListCmd_J()
+  let g:QFixHowm_ListCloseOnJump = !g:QFixHowm_ListCloseOnJump
+  echo 'Close on jump : ' . (g:QFixHowm_ListCloseOnJump? 'ON' : 'OFF')
+endfunction
+
 function! s:BufLeave()
-  " set nowinfixheight
   let s:lnum = line('.')
   if b:PreviewEnable
     call QFixPclose()
@@ -134,7 +154,12 @@ function! s:CR()
     call QFixHowmActionLock()
     return
   endif
-  call QFixEditFile(file)
+  if g:QFixHowm_ListCloseOnJump
+    silent! close
+    exec 'edit '.escape(file, ' %#')
+  else
+    call QFixEditFile(file)
+  endif
   call cursor(lnum, 1)
   exec 'normal! zz'
 endfunction
@@ -261,7 +286,7 @@ function! s:Sort(cmd, sq)
   elseif a:cmd =~ 'text'
     let sq = sort(a:sq, "s:QFixCompareText")
   endif
-  if g:QFix_Sort =~ 'r.*'
+  if a:cmd =~ 'r.*'
     let sq = reverse(a:sq)
   endif
   let g:QFix_SearchResult = []
@@ -391,13 +416,21 @@ function! QFixHowmOpenMenu(...)
   endif
   let glist = QFixHowmReadfile(mfile)
   let use_reminder = count(glist, '%reminder')
+  let use_recent   = count(glist, '%recent')
+  let use_random   = count(glist, '%random')
   let from = g:howm_fileencoding
   let to   = &enc
   call map(g:QFixHowmMenuList, 'iconv(v:val, from, to)')
 
+  redraw|echo 'QFixHowm : Make mru list...'
   let recent = QFixMRUGetList(g:howm_dir, g:QFixHowm_MenuRecent)
+  if use_random
+    redraw|echo 'QFixHowm : Make random cache...'
+    let random = QFixHowmRandomWalk(g:howm_random_columns)
+  endif
   let reminder = []
   if use_reminder
+    redraw|echo 'QFixHowm : Make reminder cache...'
     let saved_ull = g:QFix_UseLocationList
     let g:QFix_UseLocationList = 1
     if a:0
@@ -407,7 +440,7 @@ function! QFixHowmOpenMenu(...)
     endif
     let g:QFix_UseLocationList = saved_ull
   endif
-  let random = QFixHowmRandomWalk(g:howm_random_columns)
+
   let menubuf = 0
   for i in range(1, winnr('$'))
     if fnamemodify(bufname(winbufnr(i)), ':t') == mfilename
@@ -420,6 +453,9 @@ function! QFixHowmOpenMenu(...)
   if s:menubufnr
     exec 'b '.s:menubufnr
   else
+    if g:QFixHowm_MenuCmd != ''
+      exec g:QFixHowm_MenuCmd
+    endif
     silent! exec 'silent! edit '.mfilename
     let s:menubufnr = bufnr('%')
   endif
@@ -430,6 +466,9 @@ function! QFixHowmOpenMenu(...)
   setlocal modifiable
   exec 'setlocal fenc='.g:howm_fileencoding
   exec 'setlocal ff='.g:howm_fileformat
+  if g:QFix_Width > 0
+    exec "normal! ".g:QFixHowm_MenuWidth."\<C-W>|"
+  endif
   if g:QFixHowm_MenuHeight > 0
     exec 'resize '. g:QFixHowm_MenuHeight
   endif
@@ -443,9 +482,15 @@ function! QFixHowmOpenMenu(...)
     call setline(line('.'), str)
   endif
   call cursor(1, 1)
-  call s:HowmMenuReplace(reminder, '^\s*%reminder')
-  call s:HowmMenuReplace(recent, '^\s*%recent')
-  call s:HowmMenuReplace(random, '^\s*%random')
+  if use_reminder
+    call s:HowmMenuReplace(reminder, '^\s*%reminder')
+  endif
+  if use_recent
+    call s:HowmMenuReplace(recent, '^\s*%recent')
+  endif
+  if use_random
+    call s:HowmMenuReplace(random, '^\s*%random')
+  endif
   call setpos('.', g:HowmMenuLnum)
   if exists("*QFixHowmOpenMenuPost")
     call QFixHowmOpenMenuPost()
@@ -570,8 +615,8 @@ function! HowmMenuCR() range
     call QFixHowmActionLock()
     return ''
   endif
+  call QFixPclose()
   if g:QFixHowm_MenuCloseOnJump
-    " set nowinfixheight
     exec 'edit '.escape(file, ' %#')
   else
     call QFixEditFile(file)
@@ -596,30 +641,32 @@ function! HowmMenuClose()
 endfunction
 
 function! s:BufWinEnterMenu(preview, head)
-  " setlocal winfixheight
+  setlocal winfixheight
+  let &wrap=g:QFixHowm_MenuWrap
   let b:updatetime = g:QFix_PreviewUpdatetime
   exec 'setlocal updatetime='.b:updatetime
   if !exists('b:PreviewEnable')
     let b:PreviewEnable = a:preview
   endif
 
-  hi def link QFMenuButton	Special
-  hi def link QFMenuSButton	Identifier
-  exec 'set ft='.g:QFixHowm_FileType
+  hi link QFMenuButton	Special
+  hi link QFMenuSButton	Identifier
+  exe 'set ft='.g:QFixHowm_FileType
   syn region QFMenuSButton start=+%"\zs+ end=+[^"]\+\ze"\[+ end='$'
-  syn region QFMenuButton start=+"\[\zs+ end=+[^\]]\+\ze\(\s\|]\)+ end='$'
-  exec 'syn match	mqfFileName	"^'.a:head.'[^|]*"'.' nextgroup=qfSeparator'
-  syn match	qfSeparator	"|" nextgroup=qfLineNr contained
-  syn match	qfLineNr	"[^|]*" contained contains=qfError
-  syn match	qfError		"error" contained
+  syn region QFMenuButton  start=+"\[\zs+ end=+[^\]]\+\ze\(\s\|]\)+ end='$'
+  exe 'syn match mqfFileName "^'.a:head.'[^|]*"'.' nextgroup=qfSeparator'
+  syn match qfSeparator "|" nextgroup=qfLineNr contained
+  syn match qfLineNr    "[^|]*" contained contains=qfError
+  syn match qfError     "error" contained
 
-  hi def link mqfFileName	Directory
-  hi def link qfLineNr	LineNr
-  hi def link qfError	Error
+  hi link mqfFileName Directory
+  hi link qfLineNr  LineNr
+  hi link qfError Error
   call QFixHowmQFsyntax()
 
   nnoremap <buffer> <silent> q :<C-u>call <SID>Close()<CR>
   nnoremap <buffer> <silent> i :<C-u>call <SID>TogglePreview('menu')<CR>
+  nnoremap <buffer> <silent> J :<C-u>call <SID>MenuCmd_J()<CR>
   call QFixAltWincmdMap()
   nnoremap <buffer> <silent> <CR> :<C-u>call HowmMenuCR()<CR>
   nnoremap <buffer> <silent> <2-LeftMouse> <ESC>:<C-u>call HowmMenuCR()<CR>
@@ -628,10 +675,14 @@ function! s:BufWinEnterMenu(preview, head)
 
   silent exec 'lchdir ' . escape(g:howm_dir, ' ')
 endfunction
+function! s:MenuCmd_J()
+  let g:QFixHowm_MenuCloseOnJump = !g:QFixHowm_MenuCloseOnJump
+  echo 'Close on jump : ' . (g:QFixHowm_MenuCloseOnJump? 'ON' : 'OFF')
+endfunction
 
 let g:HowmMenuLnum = [0, 1, 1, 0]
 function! s:BufLeaveMenu()
-  " set nowinfixheight
+  set nowinfixheight
   let g:HowmMenuLnum = getpos('.')
   if b:PreviewEnable
     call QFixPclose()
@@ -643,7 +694,7 @@ function! s:PreviewMenu(head)
     return
   endif
   let [file, lnum] = s:Getfile('.', a:head)
-  if file == ''
+  if file == '' && g:QFixHowm_MenuPreview == 0
     call QFixPclose()
     return
   endif
@@ -710,7 +761,6 @@ function! QFixHowmListAllTitleAlt(...)
   setlocal nobuflisted
   setlocal nowrap
   setlocal cursorline
-  " setlocal winfixheight
   wincmd J
 
   setlocal modifiable
@@ -748,7 +798,6 @@ function! SetHowmFiles(glist, ...)
   setlocal nobuflisted
   setlocal nowrap
   setlocal cursorline
-  " setlocal winfixheight
   wincmd J
 
   let glist = []

@@ -2,9 +2,9 @@
 "    Description: MRU entry list (with QFixPreview)
 "         Author: fuenor <fuenor@gmail.com>
 "                 http://sites.google.com/site/fudist/Home  (Japanese)
-"  Last Modified: 2011-03-26 10:47
+"  Last Modified: 2011-08-29 06:34
 "=============================================================================
-let s:Version = 1.01
+let s:Version = 1.07
 scriptencoding utf-8
 
 "What Is This:
@@ -60,13 +60,17 @@ endif
 if !exists('g:QFixMRU_fileencoding')
   let g:QFixMRU_fileencoding = 'utf-8'
 endif
+" MRUをフルパスで保存する
+if !exists('g:QFixMRU_FullPathMode')
+  let g:QFixMRU_FullPathMode = 0
+endif
 " MRU最大表示数
 if !exists('g:QFixMRU_Entries')
   let g:QFixMRU_Entries = 20
 endif
 " MRU最大登録数
 if !exists('g:QFixMRU_EntryMax')
-  let g:QFixMRU_EntryMax = 500
+  let g:QFixMRU_EntryMax = 300
 endif
 " 基準dir以下のエントリのみを表示
 if !exists('g:QFixMRU_DirMode')
@@ -86,11 +90,13 @@ if !exists('g:QFixMRU_IgnoreTitle')
 endif
 " MRUに登録するファイル名
 if !exists('g:QFixMRU_RegisterFile')
-  let g:QFixMRU_RegisterFile = '\.\(howm\|txt\|mkd\|wiki\)$'
+  " let g:QFixMRU_RegisterFile = '\.\(howm\|txt\|mkd\|wiki\)$'
+  let g:QFixMRU_RegisterFile = ''
 endif
 " MRUタイトルの正規表現リスト
 if !exists('g:QFixMRU_Title')
-  let g:QFixMRU_Title = {'mkd' : '^#',  'wiki' : '^='}
+  " let g:QFixMRU_Title = {'mkd' : '^#',  'wiki' : '^='}
+  let g:QFixMRU_Title = {}
 endif
 " 任意の拡張子のタイトルを追加設定
 " 拡張子hogeのファイルの「行頭のfuga」をタイトルと見なす設定
@@ -121,6 +127,7 @@ endif
 
 command! -count -nargs=* QFixMRU call QFixMRU(<f-args>)
 command! -nargs=* QFixMRUread call QFixMRURead(<f-args>)
+command! -nargs=* QFixMRURead call QFixMRURead(<f-args>)
 
 augroup QFixMRU
   autocmd!
@@ -128,13 +135,20 @@ augroup QFixMRU
   autocmd VimLeave                    * call <SID>VimLeave()
   autocmd BufRead,BufNewFile,BufEnter * call <SID>BufEnter()
   autocmd BufLeave                    * call <SID>BufLeave()
+  autocmd BufWritePost                * call <SID>BufWritePost()
   autocmd CursorMoved                 * call <SID>CursorMoved()
 augroup END
 
 " MRU表示
 function! QFixMRU(...)
+  if g:QFixMRU_state == 0
+    call QFixMRURead()
+    call QFixMRUWrite(0)
+  endif
   if len(s:MruDic) == 0
+    echohl ErrorMsg
     redraw|echo 'QFixMRU: MRU is empty!'
+    echohl None
     return
   endif
   let dirmode = g:QFixMRU_DirMode
@@ -161,6 +175,7 @@ function! QFixMRU(...)
   call QFixMRUOpenPre(s:MruDic, entries, dir)
   let sq = QFixMRUPrecheck(s:MruDic, entries, dir)
   call QFixMRUOpen(sq, basedir)
+  redraw | echo ''
 endfunction
 
 function! QFixMRUPrecheck(sq, entries, dir)
@@ -183,9 +198,8 @@ function! QFixMRUPrecheck(sq, entries, dir)
 
   let sq = deepcopy(osq)
   if dirmode
-    let dir = fnamemodify(dir, ':p')
-    let dir = substitute(dir, '\\', '/', 'g')
-    call filter(sq, "!match(v:val['filename'], dir)")
+    let dir = QFixNormalizePath(fnamemodify(dir, ':p'))
+    call filter(sq, "stridx(v:val['filename'], dir)==0")
   endif
 
   " 高速化のためtempバッファ使用
@@ -206,7 +220,7 @@ function! QFixMRUPrecheck(sq, entries, dir)
       continue
     endif
     let tpattern = ''
-    silent! let tpattern = g:QFixMRU_Title[fnamemodify(file, ':e')]
+    silent! let tpattern = g:QFixMRU_Title[tolower(fnamemodify(file, ':e'))]
     if tpattern != ''
       let [min, max] = s:QFixMRUEntryRange(file, d['lnum'], d['text'], tpattern)
       if min == 0
@@ -229,6 +243,24 @@ function! QFixMRUPrecheck(sq, entries, dir)
   silent! bd
 
   return mru
+endfunction
+
+" Windowsパス正規化
+let s:MSWindows = has('win95') + has('win16') + has('win32') + has('win64')
+silent! function QFixNormalizePath(path, ...)
+  let path = a:path
+  " let path = expand(a:path)
+  if s:MSWindows
+    if a:0 " 比較しかしないならキャピタライズ
+      let path = toupper(path)
+    else
+      " expand('~') で展開されるとドライブレターは大文字、
+      " expand('c:/')ではそのままなので統一
+      let path = substitute(path, '^\([a-z]\):', '\u\1:', '')
+    endif
+    let path = substitute(path, '\\', '/', 'g')
+  endif
+  return path
 endfunction
 
 function! s:QFixMRUEntryRange(file, lnum, title, tpattern)
@@ -258,17 +290,18 @@ function! s:QFixMRUEntryRange(file, lnum, title, tpattern)
   return [min, max]
 endfunction
 
-" FIXME:エンコーディング強制方法を汎用的に
 function! s:read(mfile)
   let mfile = a:mfile
   let cmd = '0read '
   let opt = ''
-  if exists('g:loaded_HowmSchedule') && fnamemodify(mfile, ':e') =~ g:QFixHowm_FileExt.'\|howm'
-    if g:QFixHowm_ForceEncoding && IsQFixHowmFile(mfile)
-      let opt = ' ++enc='.g:howm_fileencoding .' ++ff='.g:howm_fileformat
-    endif
-  endif
+  let cmd = cmd . QFixPreviewReadOpt(mfile)
   silent! exec cmd . ' ' . opt .' '. escape(mfile, ' #%')
+  silent! $delete _
+endfunction
+
+" プレビューのエンコーディング強制オプション
+silent! function QFixPreviewReadOpt(file)
+  return ''
 endfunction
 
 " MRU表示前処理
@@ -301,6 +334,10 @@ function! QFixMRURead(...)
   let file = g:QFixMRU_Filename
   let basedir = ''
   let merge = 0
+  if g:QFixMRU_state == 0
+    let g:QFixMRU_state = 1
+    let merge = 1
+  endif
   for index in range (1, a:0)
     if a:{index} =~ '^/merge$'
       let merge = 1
@@ -357,10 +394,14 @@ function! QFixMRURead(...)
     let file = strpart(d, 0, idx)
     " CAUTION:パフォーマンス優先
     " let file = fnamemodify(file, ':p')
-    if filereadable(bpath.'/'.file)
-      let file = bpath.'/'.file
-    else
-      let file = fnamemodify(file, ':p')
+    if !g:QFixMRU_FullPathMode
+      if filereadable(bpath.'/'.file)
+        let file = bpath.'/'.file
+      elseif !filereadable(file)
+        continue
+      endif
+    elseif !filereadable(file)
+      continue
     endif
     let file = substitute(file, '\\', '/', 'g')
     let d = strpart(d, idx+1)
@@ -435,7 +476,7 @@ function! QFixMRUGet(mode, mfile, lnum, ...)
   endif
   let lnum = a:lnum
   let tpattern = ''
-  silent! let tpattern = g:QFixMRU_Title[fnamemodify(expand(mfile), ':e')]
+  silent! let tpattern = g:QFixMRU_Title[tolower(fnamemodify(expand(mfile), ':e'))]
   if a:0
     let tpattern = a:1
   endif
@@ -479,9 +520,9 @@ function! QFixMRUGet(mode, mfile, lnum, ...)
   call cursor(lnum, 1)
   "空白行なら一番近い行の内容を取得
   if text == ''
-    let tlnum = search('^\s*[^\s]', 'cnbW')
+    let tlnum = search('^\s*[^[:space:]]', 'cnbW')
     if tlnum == 0
-      let tlnum = search('\s*[^\s]', 'cnW')
+      let tlnum = search('\s*[^[:space:]]', 'cnW')
     endif
     if tlnum
       let text = getline(tlnum)
@@ -499,6 +540,9 @@ function! QFixMRUGet(mode, mfile, lnum, ...)
   endif
 
   if mode == 'entry'
+    if a:lnum > elnum
+      return [[], -1, -1]
+    endif
     return [glist, flnum, elnum]
   endif
   return [text, flnum, elnum]
@@ -516,8 +560,9 @@ endfunction
 
 "Get mru title regular expression for vim
 function! QFixMRUGetTitleRegxp(suffix)
+  let suffix = tolower(a:suffix)
   let t = ''
-  silent! let t = g:QFixMRU_Title[a:suffix]
+  silent! let t = g:QFixMRU_Title[suffix]
   return t
 endfunction
 
@@ -553,7 +598,7 @@ function! QFixMRUClear()
   let idx = 0
   for d in s:MruDic
     let tpattern = ''
-    silent! let tpattern = g:QFixMRU_Title[fnamemodify(d['filename'], ':e')]
+    silent! let tpattern = g:QFixMRU_Title[tolower(fnamemodify(d['filename'], ':e'))]
     if tpattern != '' && d['text'] =~ tpattern.'\s*$'
       call remove(s:MruDic, idx)
       continue
@@ -600,9 +645,9 @@ function! QFixMRUWrite(write, ...)
     return
   endif
 
-  let lnum = search('^\s*[^\s]', 'cnbW')
+  let lnum = search('^\s*[^[:space:]]', 'cnbW')
   if lnum == 0
-    let lnum = search('\s*[^\s]', 'cnW')
+    let lnum = search('\s*[^[:space:]]', 'cnW')
   endif
   let [text, min, max] = QFixMRUGet('title', '%', lnum)
   let mru = {'filename':mfile, 'lnum':lnum, 'text':text}
@@ -612,16 +657,17 @@ endfunction
 function! s:Register(mru)
   let mru = a:mru
   let mfile = mru['filename']
+  let mfile = QFixNormalizePath(fnamemodify(mfile, ':p'))
   let text = mru['text']
   let lnum = mru['lnum']
 
-  if g:QFixMRU_IgnoreFile != '' && mfile =~ g:QFixMRU_IgnoreFile
-    return
-  endif
   if g:QFixMRU_RegisterFile != '' && mfile !~ g:QFixMRU_RegisterFile
     return
   endif
-  if g:QFixMRU_IgnoreTitle != '' && text =~ g:QFixMRU_IgnoreTitle
+  if g:QFixMRU_IgnoreFile   != '' && mfile =~ g:QFixMRU_IgnoreFile
+    return
+  endif
+  if g:QFixMRU_IgnoreTitle  != '' && text =~ g:QFixMRU_IgnoreTitle
     return
   endif
 
@@ -631,11 +677,12 @@ function! s:Register(mru)
 
   " 重複エントリの削除
   let tpattern = ''
-  silent! let tpattern = g:QFixMRU_Title[fnamemodify(mfile, ':e')]
+  silent! let tpattern = g:QFixMRU_Title[tolower(fnamemodify(mfile, ':e'))]
 
   let idx = 0
   for d in s:MruDic
     let dfile = d['filename']
+    let dfile = QFixNormalizePath(fnamemodify(dfile, ':p'))
     if dfile == mfile
       if tpattern == ''
         silent! call remove(s:MruDic, idx)
@@ -672,7 +719,10 @@ function! s:WriteMru(mru, mrufile)
   call add(mlist, mline)
   silent! exec 'lchdir ' . escape(expand(g:QFixMRU_BaseDir), ' ')
   for d in mrudic
-    let file = fnamemodify(d['filename'], ':.')
+    let file = d['filename']
+    if !g:QFixMRU_FullPathMode
+      let file = fnamemodify(file, ':.')
+    endif
     let file = substitute(file, '\\', '/', 'g')
     let mline = file.'|'.d['lnum'].'|'.d['text']
     let mline = iconv(mline, from, to)
@@ -703,6 +753,10 @@ function! s:BufEnter()
 endfunction
 
 function! s:BufLeave()
+  call QFixMRUWrite(0)
+endfunction
+
+function! s:BufWritePost()
   call QFixMRUWrite(0)
 endfunction
 

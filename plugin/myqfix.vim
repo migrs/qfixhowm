@@ -3,10 +3,10 @@
 "                 Preview, sortings and advanced search for Quickfix.
 "         Author: Futoshi Ueno <fuenor@gmail.com>
 "                 http://sites.google.com/site/fudist/Home  (Japanese)
-"  Last Modified: 2011-03-10 21:52
+"  Last Modified: 2011-08-29 06:01
 "=============================================================================
 scriptencoding utf-8
-let s:Version = 2.80
+let s:Version = 2.83
 
 "What Is This:
 "  This plugin adds preview, sortings and advanced search to your quickfix window.
@@ -74,6 +74,14 @@ endif
 if !exists('g:QFix_CursorLine')
   let g:QFix_CursorLine = 1
 endif
+"プレビューウィンドウのコマンド指定
+if !exists('g:QFix_PreviewOpenCmd')
+  let g:QFix_PreviewOpenCmd = ''
+endif
+"プレビューウィンドウのサイズ指定
+if !exists('g:QFix_PreviewWidth')
+  let g:QFix_PreviewWidth = 0
+endif
 "プレビューのカーソル強調表示
 if !exists('g:QFix_PreviewCursorLine')
   let g:QFix_PreviewCursorLine = 1
@@ -101,7 +109,7 @@ endif
 
 "プレビューする間隔
 if !exists('g:QFix_PreviewUpdatetime')
-  let g:QFix_PreviewUpdatetime = 10
+  let g:QFix_PreviewUpdatetime = 12
 endif
 "ファイル名取得の高速化
 if !exists('g:QFix_HighSpeedPreview')
@@ -133,10 +141,10 @@ if !exists('g:QFix_Copen_winfixwidth')
   let g:QFix_Copen_winfixwidth    = 0
 endif
 if !exists('g:QFix_Preview_winfixheight')
-  let g:QFix_Preview_winfixheight = 0
+  let g:QFix_Preview_winfixheight = 1
 endif
 if !exists('g:QFix_Preview_winfixwidth')
-  let g:QFix_Preview_winfixwidth = 0
+  let g:QFix_Preview_winfixwidth  = 1
 endif
 if !exists('g:QFix_TabEditMode')
   let g:QFix_TabEditMode = 1
@@ -221,6 +229,24 @@ let s:tempdir = fnamemodify(tempname(), ':p:h')
 if !exists('g:qfixtempname')
   let g:qfixtempname = tempname()
 endif
+
+" Windowsパス正規化
+let s:MSWindows = has('win95') + has('win16') + has('win32') + has('win64')
+function! QFixNormalizePath(path, ...)
+  let path = a:path
+  " let path = expand(a:path)
+  if s:MSWindows
+    if a:0 " 比較しかしないならキャピタライズ
+      let path = toupper(path)
+    else
+      " expand('~') で展開されるとドライブレターは大文字、
+      " expand('c:/')ではそのままなので統一
+      let path = substitute(path, '^\([a-z]\):', '\u\1:', '')
+    endif
+    let path = substitute(path, '\\', '/', 'g')
+  endif
+  return path
+endfunction
 
 "BufWinEnter
 function! s:QFixSetup(...)
@@ -633,7 +659,7 @@ function! QFixSort(cmd)
   elseif a:cmd =~ 'text'
     let save_qflist = sort(save_qflist, "QFixCompareText")
   endif
-  if g:QFix_Sort =~ 'r.*'
+  if a:cmd =~ 'r.*'
     let save_qflist = reverse(save_qflist)
   endif
   let g:QFix_SearchResult = []
@@ -975,7 +1001,13 @@ function! QFixPclose()
   elseif winnr('$') == 1 && tabpagenr('$') > 1 && &previewwindow
     tabclose
   else
+    let saved_winfixheight = &winfixheight
+    let saved_winfixwidth  = &winfixwidth
+    setlocal nowinfixheight
+    setlocal nowinfixwidth
     silent! pclose!
+    let &winfixheight = saved_winfixheight
+    let &winfixwidth  = saved_winfixwidth
   endif
   if &buftype == 'quickfix'
     call QFixResize(h)
@@ -1055,13 +1087,16 @@ function! QFixPreviewOpen(file, line, ...)
   let s:QFixPreviewfile = file
   if &previewwindow
   else
-    silent! exec 'silent! pedit! '.s:tempdir.'/'.g:QFix_PreviewName
+    let saved_winfixheight = &winfixheight
+    let saved_winfixwidth  = &winfixwidth
+    " setlocal winfixheight
+    " setlocal winfixwidth
+    silent! exec 'silent! '.g:QFix_PreviewOpenCmd.' pedit! '.s:tempdir.'/'.g:QFix_PreviewName
+    let &winfixheight = saved_winfixheight
+    let &winfixwidth  = saved_winfixwidth
   endif
   silent! wincmd P
   let s:QFix_PreviewWin = bufnr('%')
-  if exists('g:QFix_PreviewHeight')
-    exec 'resize '.g:QFix_PreviewHeight
-  endif
   " set options
   setlocal nobuflisted
   setlocal noswapfile
@@ -1069,6 +1104,12 @@ function! QFixPreviewOpen(file, line, ...)
   setlocal bufhidden=delete
   let &winfixheight = g:QFix_Preview_winfixheight
   let &winfixwidth  = g:QFix_Preview_winfixwidth
+  if g:QFix_PreviewWidth > 0
+    exe "normal! ".g:QFix_PreviewWidth."\<C-W>|"
+  endif
+  if exists('g:QFix_PreviewHeight')
+    exec 'resize '.g:QFix_PreviewHeight
+  endif
   setlocal modifiable
   silent! %delete _
   if g:QFix_PreviewExclude != '' && file =~ g:QFix_PreviewExclude

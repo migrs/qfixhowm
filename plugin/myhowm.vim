@@ -2,8 +2,8 @@
 "    Description: 拡張Quickfixに対応したhowm
 "         Author: fuenor <fuenor@gmail.com>
 "                 http://sites.google.com/site/fudist/Home/qfixhowm
-"  Last Modified: 2011-04-22 09:36
-"        Version: 2.46
+"  Last Modified: 2011-05-26 22:49
+"        Version: 2.48
 "=============================================================================
 scriptencoding utf-8
 "キーマップリーダーが g の場合、「新規ファイルを作成」は g,c です。
@@ -250,6 +250,14 @@ if !exists('g:QFixHowm_TitleFilterReg')
   let g:QFixHowm_TitleFilterReg = ''
 endif
 
+if !exists('howm_glink_pattern')
+  let howm_glink_pattern = '>>>'
+endif
+"タブで編集('tab'を設定)
+if !exists('QFixHowm_Edit')
+  let QFixHowm_Edit = ''
+endif
+
 if g:QFixHowm_Default_Key > 0
   let s:QFixHowm_Key = g:QFixHowm_Key . g:QFixHowm_KeyB
   exec 'silent! nnoremap <unique> <silent> '.s:QFixHowm_Key.'t     :<C-u>call QFixHowmListReminderCache("todo")<CR>'
@@ -260,21 +268,8 @@ if g:QFixHowm_Default_Key > 0
   exec 'silent! nnoremap <unique> <silent> '.s:QFixHowm_Key.'rd    :<C-u>call QFixHowmGenerateRepeatDate()<CR>'
   exec "silent! nnoremap <unique> <silent> ".s:QFixHowm_Key."d :call QFixHowmInsertDate('Date')<CR>"
   exec "silent! nnoremap <unique> <silent> ".s:QFixHowm_Key."T :call QFixHowmInsertDate('Time')<CR>"
-endif
-
-if QFixHowm_MenuBar && ((exists('HowmSchedule_only') && HowmSchedule_only == 1) || (exists('disable_MyHowm') && disable_MyHowm == 1))
-  let s:menu = '&Tools.QFixHowm(&H)'
-  if QFixHowm_MenuBar == 2
-    let s:menu = 'Howm(&O)'
-  elseif QFixHowm_MenuBar == 3 || MyGrep_MenuBar == 3
-    let s:menu = 'QFixApp(&Q).QFixHowm(&H)'
-  endif
-  let s:QFixHowm_Key = escape(g:QFixHowm_Key . g:QFixHowm_KeyB, '\\')
-  exec 'amenu <silent> 41.332 '.s:menu.'.Schedule(&Y)<Tab>'.s:QFixHowm_Key.'y  :<C-u>call QFixHowmListReminderCache("schedule")<CR>'
-  exec 'amenu <silent> 41.332 '.s:menu.'.Todo(&T)<Tab>'.s:QFixHowm_Key.'t  :<C-u>call QFixHowmListReminderCache("todo")<CR>'
-  exec 'amenu <silent> 41.332 '.s:menu.'.Rebuild-Schedule(&I)<Tab>'.s:QFixHowm_Key.'ry  :<C-u>call QFixHowmListReminder("schedule")<CR>'
-  exec 'amenu <silent> 41.332 '.s:menu.'.Rebuild-Todo(&K)<Tab>'.s:QFixHowm_Key.'rt  :<C-u>call QFixHowmListReminder("todo")<CR>'
-  let s:QFixHowm_Key = g:QFixHowm_Key . g:QFixHowm_KeyB
+  exec 'silent! nnoremap <unique> <silent> '.s:QFixHowm_Key.',  :<C-u>call QFixHowmOpenMenu("cache")<CR>'
+  exec 'silent! nnoremap <unique> <silent> '.s:QFixHowm_Key.'r, :<C-u>call QFixHowmOpenMenu()<CR>'
 endif
 
 """"""""""""""""""""""""""""""
@@ -293,29 +288,29 @@ function! s:makeRegxp(dpattern)
 
   "let s:sch_date     = '\d\{4}-\d\{2}-\d\{2}'
   let s:sch_date = s:hts_date
-  let s:sch_date = substitute(s:sch_date, '%Y', '\\d\\{4}', '')
-  let s:sch_date = substitute(s:sch_date, '%m', '\\d\\{2}', '')
-  let s:sch_date = substitute(s:sch_date, '%d', '\\d\\{2}', '')
+  let s:sch_date = substitute(s:sch_date, '%Y', '\\d\\{4}', 'g')
+  let s:sch_date = substitute(s:sch_date, '%m', '\\d\\{2}', 'g')
+  let s:sch_date = substitute(s:sch_date, '%d', '\\d\\{2}', 'g')
   let g:QFixHowm_Date = s:sch_date
 
   let s:sch_printfDate = s:hts_date
-  let s:sch_printfDate = substitute(s:sch_printfDate, '%Y', '%4.4d', '')
-  let s:sch_printfDate = substitute(s:sch_printfDate, '%m', '%2.2d', '')
-  let s:sch_printfDate = substitute(s:sch_printfDate, '%d', '%2.2d', '')
+  let s:sch_printfDate = substitute(s:sch_printfDate, '%Y', '%4.4d', 'g')
+  let s:sch_printfDate = substitute(s:sch_printfDate, '%m', '%2.2d', 'g')
+  let s:sch_printfDate = substitute(s:sch_printfDate, '%d', '%2.2d', 'g')
 
   let s:sch_ExtGrep = s:hts_date. ' ' . s:hts_time
-  let s:sch_ExtGrep = substitute(s:sch_ExtGrep, '%Y', '[0-9]{4}', '')
-  let s:sch_ExtGrep = substitute(s:sch_ExtGrep, '%m', '[0-9]{2}', '')
-  let s:sch_ExtGrep = substitute(s:sch_ExtGrep, '%d', '[0-9]{2}', '')
-  let s:sch_ExtGrep = substitute(s:sch_ExtGrep, '%H', '[0-9]{2}', '')
-  let s:sch_ExtGrep = substitute(s:sch_ExtGrep, '%M', '[0-9]{2}', '')
+  let s:sch_ExtGrep = substitute(s:sch_ExtGrep, '%Y', '[0-9][0-9][0-9][0-9]', 'g')
+  let s:sch_ExtGrep = substitute(s:sch_ExtGrep, '%m', '[0-9][0-9]', 'g')
+  let s:sch_ExtGrep = substitute(s:sch_ExtGrep, '%d', '[0-9][0-9]', 'g')
+  let s:sch_ExtGrep = substitute(s:sch_ExtGrep, '%H', '[0-9][0-9]', 'g')
+  let s:sch_ExtGrep = substitute(s:sch_ExtGrep, '%M', '[0-9][0-9]', 'g')
 
   let s:sch_ExtGrepS = s:hts_date. '( ' . s:hts_time . ')?'
-  let s:sch_ExtGrepS = substitute(s:sch_ExtGrepS, '%Y', '[0-9]{4}', '')
-  let s:sch_ExtGrepS = substitute(s:sch_ExtGrepS, '%m', '[0-9]{2}', '')
-  let s:sch_ExtGrepS = substitute(s:sch_ExtGrepS, '%d', '[0-9]{2}', '')
-  let s:sch_ExtGrepS = substitute(s:sch_ExtGrepS, '%H', '[0-9]{2}', '')
-  let s:sch_ExtGrepS = substitute(s:sch_ExtGrepS, '%M', '[0-9]{2}', '')
+  let s:sch_ExtGrepS = substitute(s:sch_ExtGrepS, '%Y', '[0-9][0-9][0-9][0-9]', 'g')
+  let s:sch_ExtGrepS = substitute(s:sch_ExtGrepS, '%m', '[0-9][0-9]', 'g')
+  let s:sch_ExtGrepS = substitute(s:sch_ExtGrepS, '%d', '[0-9][0-9]', 'g')
+  let s:sch_ExtGrepS = substitute(s:sch_ExtGrepS, '%H', '[0-9][0-9]', 'g')
+  let s:sch_ExtGrepS = substitute(s:sch_ExtGrepS, '%M', '[0-9][0-9]', 'g')
 
   "let s:sch_time     = '\d\{2}:\d\{2}'
   let s:sch_time = s:hts_time
@@ -331,6 +326,7 @@ function! s:makeRegxp(dpattern)
   let s:sch_dateCmd  = s:sch_dateT . s:sch_Ext . '\{1,3}\(([0-9]*[-+*]\?'.s:sch_dow.'\?)\)\?[0-9]*'
   let s:sch_cmd      = s:sch_Ext . '\{1,3}\(([0-9]*[-+*]\?'.s:sch_dow.'\?\([-+]\d\+\)\?)\)\?[0-9]*'
   let s:Recentmode_Date   = '(\d\{12})'
+  let g:qfixmemo_scheduleformat = s:sch_dateCmd
 endfunction
 call s:makeRegxp(g:QFixHowm_DatePattern)
 
@@ -340,6 +336,12 @@ let s:LT_todo = 0
 let s:sq_todo = []
 let s:LT_menu = 0
 let s:sq_menu = []
+let s:howmtempfile = g:qfixtempname
+
+" jvgrep使用時に正規表現[-abc]の - をエスケープして実行
+if !exists('g:QFixHowm_jvgrep_escape_hyphen')
+  let g:QFixHowm_jvgrep_escape_hyphen = 1
+endif
 
 function! QFixHowmInsertDate(fmt)
   let fmt = s:hts_dateTime
@@ -447,7 +449,7 @@ function! s:QFixHowmListReminder_(mode)
   if g:QFixHowm_RemovePriority > -1
     let ext = substitute(ext, '\.', '', '')
   endif
-  if !exists('g:mygrepprg') || g:mygrepprg == 'internal' || g:mygrepprg == '' || g:QFixHowm_ScheduleSearchVimgrep 
+  if !exists('g:mygrepprg') || g:mygrepprg == 'internal' || g:mygrepprg == '' || g:QFixHowm_ScheduleSearchVimgrep
     let g:MyGrep_UseVimgrep = 1
     let searchWord = '^\s*'.s:sch_dateT.ext
   elseif g:mygrepprg == 'findstr'
@@ -457,7 +459,10 @@ function! s:QFixHowmListReminder_(mode)
     let searchWord = substitute(searchWord, '%d', '[0-9][0-9]', '')
     let searchWord = '^[ \t]*\['.searchWord.'[0-9: ]*\]'.ext
   else
-    let searchWord = '^[ \t]*\['.s:sch_ExtGrepS.']'.ext
+    let searchWord = '^[ \t]*\['.s:sch_ExtGrepS.'\]'.ext
+    if g:mygrepprg =~ 'jvgrep' && g:QFixHowm_jvgrep_escape_hyphen
+      let searchWord = substitute(searchWord, '\(^\|[^\\]\)[-', '\1[\\-', 'g')
+    endif
   endif
   let searchPath = l:howm_dir
   if exists('*MultiHowmDirGrep')
@@ -467,11 +472,13 @@ function! s:QFixHowmListReminder_(mode)
       let addflag = MultiHowmDirGrep(searchWord, searchPath, l:SearchFile, g:howm_fileencoding, addflag, 'g:QFixHowm_ScheduleSearchDir')
     endif
   endif
+  redraw | echo 'QFixHowm : Searching...'
   call MyGrep(searchWord, searchPath, l:SearchFile, g:howm_fileencoding, addflag)
   let sq = QFixGetqflist()
   call extend(sq, holiday_sq)
   let s:UseTitleFilter = 1
   call QFixHowmTitleFilter(sq)
+  redraw|echo 'QFixHowm : Sorting...'
   let sq = s:QFixHowmSortReminder(sq, a:mode)
   " for d in holiday_sq
   "   call filter(sq, "v:val['text'] == d['text']")
@@ -481,7 +488,9 @@ function! s:QFixHowmListReminder_(mode)
   else
     exec 'let s:LT_' . a:mode . ' = localtime()'
     exec 'let s:sq_' . a:mode . ' = sq'
+    redraw|echo 'QFixHowm : Set quickfix list...'
     call QFixSetqflist(sq)
+    redraw | echo ''
     let g:QFix_SearchPath = l:howm_dir
     QFixCopen
     if g:QFixHowm_SchedulePreview == 0 && g:QFix_PreviewEnable == 1
@@ -1438,7 +1447,7 @@ function! QFixHowmGenerateRepeatDate()
   endif
 
   let rep = ''
-  if cmd =~ '[-@!+~.]\{2}'
+  if cmd =~ '['.s:sch_ext.']\{2}'
     let rep = substitute(tstr, '^\(\d\{4}.\d\{2}.\)\(\d\{2}\).*', '\2', '')
   endif
   let opt = matchstr(cmd, '[0-9]*$')
@@ -1551,6 +1560,10 @@ endif
 if !exists('g:QFixHowm_UserURIopen_wiki')
   let g:QFixHowm_UserURIopen_wiki = 0
 endif
+" ユーザアクションロックの最大数
+if !exists('g:QFixHowm_UserSwActionLockMax')
+  let g:QFixHowm_UserSwActionLockMax = 8
+endif
 
 function! QFixHowmBufferBufEnter()
   if !IsQFixHowmFile('%')
@@ -1615,11 +1628,37 @@ function! QFixHowmScheduleActionStr()
     return ret
   endif
   call setpos('.', save_cursor)
+  if exists('g:QFixHowm_UserSwActionLock')
+    let ret = QFixHowmSwitchActionLock(g:QFixHowm_UserSwActionLock)
+    if ret != "\<CR>"
+      return ret
+    endif
+  endif
+  call setpos('.', save_cursor)
+  for i in range(2, g:QFixHowm_UserSwActionLockMax)
+    if !exists('g:QFixHowm_UserSwActionLock'.i)
+      continue
+    endif
+    call setpos('.', save_cursor)
+    exec 'let action = '.'g:QFixHowm_UserSwActionLock'.i
+    if action != []
+      let ret = QFixHowmSwitchActionLock(action)
+      if ret != "\<CR>"
+        return ret
+      endif
+    endif
+  endfor
+  call setpos('.', save_cursor)
   if col('.') < 36 && getline('.') =~ '^'.s:sch_dateT.s:sch_Ext
     let ret = QFixHowmSwitchActionLock(g:QFixHowm_ScheduleSwActionLock, 1)
     if ret != "\<CR>"
       return ret
     endif
+  endif
+  call setpos('.', save_cursor)
+  let ret = QFixHowmSwitchActionLock(g:QFixHowm_SwitchListActionLock)
+  if ret != "\<CR>"
+    return ret
   endif
   call setpos('.', save_cursor)
   if getline('.') =~ '^'.s:sch_dateT.s:sch_Ext
@@ -1630,7 +1669,274 @@ function! QFixHowmScheduleActionStr()
     endif
   endif
   call setpos('.', save_cursor)
+  let ret = QFixHowmOpenKeywordLink()
+  if ret != "\<CR>"
+    return ret
+  endif
+  call setpos('.', save_cursor)
   return "\<CR>"
+endfunction
+
+" come-from/goto link
+if !exists('howm_glink_pattern')
+  let howm_glink_pattern = '>>>'
+endif
+if !exists('howm_clink_pattern')
+  let howm_clink_pattern = '<<<'
+endif
+silent! function QFixHowmOpenKeywordLink()
+  return "\<CR>"
+endfunction
+
+"=============================================================================
+" アクションロック
+"=============================================================================
+"日付のデフォルトアクションロック
+if !exists('g:QFixHowm_DateActionLockDefault')
+  let g:QFixHowm_DateActionLockDefault = 1
+endif
+"リストアクションロック
+if exists('g:QFixHowmSwitchListActionLock')
+  "SwitchListActionLockのドキュメントミス対応
+  let g:QFixHowm_SwitchListActionLock = g:QFixHowmSwitchListActionLock
+endif
+if !exists('g:QFixHowm_SwitchListActionLock')
+  let g:QFixHowm_SwitchListActionLock = ['{ }', '{*}', '{-}']
+endif
+"ユーザーマクロアクションロックの識別子
+if !exists('g:QFixHowm_MacroActionPattern')
+  let g:QFixHowm_MacroActionPattern = '<|>'
+endif
+"ユーザーマクロアクションのキーマップ
+if !exists('g:QFixHowm_MacroActionKey')
+  let g:QFixHowm_MacroActionKey = 'M'
+endif
+let s:QFixHowmALSPat = ''
+
+"アクションロック用ハイライト
+let g:QFixHowm_keyword = ''
+function! QFixHowmHighlight()
+  if !IsQFixHowmFile('%')
+    return
+  endif
+  if &syntax == ''
+    return
+  endif
+  silent! syntax clear actionlockKeyword
+  if g:QFixHowm_keyword != ''
+    exe 'syntax match actionlockKeyword display "\V'.g:QFixHowm_keyword.'"'
+  endif
+endfunction
+
+"アクションロック実行
+"TODO:strを取得しない形に修正する
+function! QFixHowmActionLock()
+  let RegisterBackup = [@0, @1, @2, @3, @4, @5, @6, @7, @8, @9, @/, @", @"]
+  if has('gui_running')
+    silent! let RegisterBackup[12] = @*
+  endif
+  let s:QFixHowmMA = 0
+  let str = QFixHowmActionLockStr()
+  if s:QFixHowmMA
+    exec 'normal '. str
+  elseif str == "\<CR>"
+    silent exec "normal! \<CR>"
+  elseif str == "\<ESC>"
+  else
+    let str = substitute(str, "\<CR>", "|", "g")
+    let str = substitute(str, "|$", "", "")
+    silent exec str
+  endif
+  for n in range(10)
+    silent! exec 'let @'.n.'=RegisterBackup['.n.']'
+  endfor
+  let @/ = RegisterBackup[10]
+  let @" = RegisterBackup[11]
+  if has('gui_running')
+    silent! let @* = RegisterBackup[12]
+  endif
+  return
+endfunction
+
+function! QFixHowmActionLockStr()
+  let save_cursor = getpos('.')
+  call setpos('.', save_cursor)
+  let ret = QFixHowmMacroAction()
+  if ret != "\<CR>"
+    let s:QFixHowmMA = 1
+    return ret
+  endif
+  call setpos('.', save_cursor)
+  let ret = QFixHowmOpenCursorline()
+  if ret == 1
+    return "\<ESC>"
+  elseif ret == -1
+    let glink = g:howm_glink_pattern
+    let file = matchstr(getline('.'), glink.'.*$', '', '')
+    let file = substitute(file, glink.'\s*', '', '')
+    if filereadable(expand(file))
+      let file = escape(file, '\')
+      return ":exec 'call QFixHowmEditFile(\"".file."\")'\<CR>"
+      return "\<ESC>"
+    endif
+    silent exec 'normal! gf'
+    return "\<ESC>"
+  endif
+  call setpos('.', save_cursor)
+  let text = getline('.')
+  let stridx = match(text, g:QFixHowm_Link)
+  if stridx > -1 && col('.') > stridx
+    let pattern = matchstr(text, g:QFixHowm_Link.'\s*.*$')
+    let pattern = substitute(pattern, '^'.g:QFixHowm_Link.'\s*', '', '')
+    let s:QFixHowmALSPat = pattern
+    call QFixHowmActionLockSearch(0)
+    return "\<ESC>"
+  endif
+  call setpos('.', save_cursor)
+  let ret = QFixHowmDateActionLock()
+  if ret != "\<CR>"
+    return ret
+  endif
+  call setpos('.', save_cursor)
+  let ret = QFixHowmTimeActionLock()
+  if ret != "\<CR>"
+    return ret
+  endif
+  call setpos('.', save_cursor)
+  if col('.') < 36 && getline('.') =~ '^'.s:sch_dateT.s:sch_Ext
+    let ret = QFixHowmSwitchActionLock(g:QFixHowm_ScheduleSwActionLock, 1)
+    if ret != "\<CR>"
+      return ret
+    endif
+  endif
+  call setpos('.', save_cursor)
+  let ret = QFixHowmRepeatDateActionLock()
+  if ret != "\<CR>"
+    return ret
+  endif
+  call setpos('.', save_cursor)
+  let ret = QFixHowmKeywordLinkSearch()
+  if ret != "\<CR>"
+    return ret
+  endif
+  call setpos('.', save_cursor)
+  let ret = QFixHowmSwitchActionLock(g:QFixHowm_SwitchListActionLock)
+  if ret != "\<CR>"
+    return ret
+  endif
+  call setpos('.', save_cursor)
+  let ret = QFixHowmSwitchActionLock(['{_}'])
+  if ret != "\<CR>"
+    return ret
+  endif
+  call setpos('.', save_cursor)
+  if exists('g:QFixHowm_UserSwActionLock')
+    let ret = QFixHowmSwitchActionLock(g:QFixHowm_UserSwActionLock)
+    if ret != "\<CR>"
+      return ret
+    endif
+  endif
+  call setpos('.', save_cursor)
+
+  for i in range(2, g:QFixHowm_UserSwActionLockMax)
+    if !exists('g:QFixHowm_UserSwActionLock'.i)
+      continue
+    endif
+    call setpos('.', save_cursor)
+    exec 'let action = '.'g:QFixHowm_UserSwActionLock'.i
+    if action != []
+      let ret = QFixHowmSwitchActionLock(action)
+      if ret != "\<CR>"
+        return ret
+      endif
+    endif
+  endfor
+  call setpos('.', save_cursor)
+  if getline('.') =~ '^'.s:sch_dateT.s:sch_Ext
+    call cursor('.', 1)
+    let ret = QFixHowmRepeatDateActionLock()
+    if ret != "\<CR>"
+      return ret
+    endif
+  endif
+  call setpos('.', save_cursor)
+  return "\<CR>"
+endfunction
+
+"Wikiスタイルリンクの扱い
+if !exists('g:QFixHowm_Wiki')
+  let g:QFixHowm_Wiki = 0
+endif
+"キーワードリンク検索
+function! QFixHowmKeywordLinkSearch()
+  let save_cursor = getpos('.')
+  let l:QFixHowm_keyword = g:QFixHowm_keyword
+  let col = col('.')
+  let lstr = getline('.')
+
+  for word in g:QFixHowm_KeywordList
+    let len = strlen(word)
+    let pos = match(lstr, '\V'.word)
+    if pos == -1 || col < pos+1
+      continue
+    endif
+    let str = strpart(lstr, col-len, 2*len)
+    if matchstr(str, '\V'.word) == word
+      let s:QFixHowmALSPat = word
+      if g:QFixHowm_Wiki > 0
+        let link = word
+        if g:QFixHowm_Wiki == 1
+          let file = g:howm_dir
+          if exists('g:QFixHowm_WikiDir')
+            let file = g:howm_dir . '/'.g:QFixHowm_WikiDir
+          endif
+          let file = file .'/'.link.'.'.g:QFixHowm_FileExt
+          call QFixEditFile(file)
+        elseif g:QFixHowm_Wiki == 2
+          let cmd = ':e '
+          let subdir = vimwiki#current_subdir()
+          call vimwiki#open_link(cmd, subdir.link)
+        endif
+        return "\<ESC>"
+      endif
+      call QFixHowmActionLockSearch(0)
+      return "\<ESC>"
+    endif
+  endfor
+  return "\<CR>"
+endfunction
+
+"アクションロック用サーチ
+function! QFixHowmActionLockSearch(regmode, ...)
+  let g:MyGrep_Regexp = a:regmode
+  let pattern = s:QFixHowmALSPat
+  if a:0 > 0
+    let pattern = input(a:1, pattern)
+  endif
+  if pattern == ''
+    return "\<CR>"
+  endif
+  call histadd('@', pattern)
+  call QFixHowmListAll(pattern, 0)
+endfunction
+
+"ユーザーマクロのアクションロック
+let s:QFixHowm_MacroActionCmd = ''
+function! QFixHowmMacroAction()
+  if g:QFixHowm_MacroActionKey == '' || g:QFixHowm_MacroActionPattern == ''
+    return "\<CR>"
+  endif
+  if expand('%:t') !~ g:QFixHowm_Menufile
+    " return "\<CR>"
+  endif
+  let text = getline('.')
+  if text !~ g:QFixHowm_MacroActionPattern
+    return "\<CR>"
+  endif
+  let text = substitute(text, '.*'.g:QFixHowm_MacroActionPattern, "", "")
+  let s:QFixHowm_MacroActionCmd = text
+  exec "nmap <silent> " . s:QFixHowm_Key . g:QFixHowm_MacroActionKey . " " . ":<C-u>:QFixCclose<CR>" .substitute(s:QFixHowm_MacroActionCmd, '^\s*', '', '')
+  return s:QFixHowm_Key . g:QFixHowm_MacroActionKey
 endfunction
 
 """"""""""""""""""""""""""""""
@@ -1718,7 +2024,7 @@ function! QFixHowmOpenCursorline()
   endif
 
   "カーソル位置の文字列を拾う
-  let urichr  =  "[-0-9a-zA-Z;/?:@&=+$,_.!~*'()%]"
+  let urichr  =  "[-0-9a-zA-Z;/?:@&=+$,_.!~*'()%#]"
   let pathchr =  "[-0-9a-zA-Z;/?:@&=+$,_.!~*'()%{}[\\]\\\\ ]"
   let pathhead = '\([A-Za-z]:[/\\]\|\~/\)'
   let urireg = '\(\(howm\|rel\|http\|https\|file\|ftp\)://\|'.pathhead.'\)'
@@ -1783,7 +2089,7 @@ function! s:openstr(str)
   let pathhead = '\([A-Za-z]:[/\\]\|\~/\|/\)'
   if str =~ '^'.pathhead
     if str !~ l:MyOpenVim_ExtReg
-      let ext = fnamemodify(str, ':e')
+      let ext = tolower(fnamemodify(str, ':e'))
       if exists('g:QFixHowm_Opencmd_'.ext)
         exec 'let cmd = g:QFixHowm_Opencmd_'.ext
         let str = expand(str)
@@ -1796,13 +2102,19 @@ function! s:openstr(str)
         return 1
       endif
     else
-      let str = escape(str, ' ')
-      exec g:QFixHowm_Edit.'edit '. escape(str, ' %#')
+      let str = expand(str)
+      if has('unix')
+        let str = escape(str, ' ')
+      endif
+      exec g:QFixHowm_Edit.'edit '. escape(str, '%#')
       return 1
     endif
     if fnamemodify(str, ':e') == ''
-      let str = escape(str, ' ')
-      exec g:QFixHowm_Edit.'edit '. escape(str, ' %#')
+      let str = expand(str)
+      if has('unix')
+        let str = escape(str, ' ')
+      endif
+      exec g:QFixHowm_Edit.'edit '. escape(str, '%#')
       return 1
     endif
   endif
@@ -2133,6 +2445,146 @@ function! QFixHowmRepeatDateActionLock()
 endfunction
 
 """"""""""""""""""""""""""""""
+"Quickfixウィンドウの定義部分を取り出す
+"休日・祝日の予定もエクスポート対象にする
+if !exists('g:QFixHowmExportHoliday')
+  let g:QFixHowmExportHoliday = 0
+endif
+function! QFixHowmCmd_ScheduleList(...) range
+  if !exists("*QFixHowmExportSchedule")
+    return
+  endif
+  let prevPath = escape(getcwd(), ' ')
+
+  let firstline = 1
+  let cnt = line('$')
+  if a:firstline != a:lastline || a:0 > 0
+    let cnt = a:lastline - a:firstline + 1
+    let firstline = a:firstline
+  endif
+
+  let schlist = []
+  let l:QFixHowm_Title = '\d\+| '.s:sch_dateT.s:sch_Ext
+  let save_cursor = getpos('.')
+  for n in range(cnt)
+    call cursor(firstline+n, 1)
+    let qfline = getline('.')
+    if qfline !~ l:QFixHowm_Title
+      continue
+    endif
+    let holiday = g:QFixHowm_ReminderHolidayName
+    if exists('g:QFixHowm_UserHolidayName')
+      let holiday = g:QFixHowm_ReminderHolidayName . '\|' .g:QFixHowm_UserHolidayName
+    endif
+    let hdreg = '^'.s:sch_dateTime .'@ '.g:QFixHowm_DayOfWeekReg.' \?'.'\('.holiday.'\)'
+    if qfline =~ holiday && g:QFixHowmExportHoliday == 0
+      continue
+    endif
+    let file = QFixGet('file')
+    let lnum = QFixGet('lnum')
+    let ddat = {"qffile": file, "qflnum": lnum, "qfline": qfline}
+    call add(schlist, ddat)
+  endfor
+  call setpos('.', save_cursor)
+
+  QFixCclose
+  let h = g:QFix_Height
+  for d in schlist
+    call s:QFixHowmMakeScheduleList(d)
+  endfor
+  let g:QFix_Height = h
+  if schlist != []
+    call s:QFixHowmParseScheduleList(schlist)
+    call QFixHowmExportSchedule(schlist)
+  else
+    QFixCopen
+  endif
+  return schlist
+endfunction
+
+function! s:QFixHowmMakeScheduleList(sdic)
+  let file = a:sdic['qffile']
+  let lnum = a:sdic['qflnum']
+  let tpattern = qfixmemo#TitleRegxp()
+  let [entry, flnum, llnum] = QFixMRUGet('entry', file, lnum, tpattern)
+  let a:sdic['orgline'] = entry[0]
+  call remove(entry, 0)
+  let a:sdic['Description'] = entry
+  return a:sdic['Description']
+endfunction
+
+function! s:QFixHowmParseScheduleList(sdic)
+  for d in a:sdic
+    let pattern = '.*'.s:sch_dateT.s:sch_Ext.'\d*\s*'.g:QFixHowm_DayOfWeekReg.'\?\s*'
+    let d['Summary'] = substitute(d['qfline'], pattern, '', '')
+    let pattern = '\['.s:sch_date
+    let d['StartDate'] = strpart(matchstr(d['qfline'], pattern), 1)
+    let d['StartDate'] = substitute(d['StartDate'], '[/]', '-', 'g')
+    let pattern = '\['.s:sch_date . ' '. s:sch_time
+    let d['StartTime'] = strpart(matchstr(d['qfline'], pattern), 12)
+    let pattern = '&\['.s:sch_date
+    let d['EndDate'] = strpart(matchstr(d['orgline'], pattern), 2)
+    let d['EndDate'] = substitute(d['EndDate'], '[/]', '-', 'g')
+    let pattern = '&\['.s:sch_date.' '. s:sch_time
+    let d['EndTime'] = strpart(matchstr(d['orgline'], pattern), 13)
+    if d['EndTime'] == ''
+      let d['EndDate'] = QFixHowmAddDate(d['EndDate'], g:QFixHowm_EndDateOffset)
+    endif
+
+    let pattern = s:sch_dateCmd
+    let d['define']  = strpart(matchstr(d['orgline'], pattern), 0)
+    let pattern = ']'.s:sch_cmd
+    let d['command'] = strpart(matchstr(d['orgline'], pattern), 1)
+    let d['duration'] = matchstr(d['command'], '\d\+$')
+
+    let duration = d['duration']
+    let cmd = d['command'][0]
+    if duration == ''
+      if cmd == '@'
+        "@のデフォルトオプションは表示だけに関係する
+        let duration = 1
+      elseif cmd == '!'
+        let duration = g:QFixHowm_ReminderDefault_Deadline
+      elseif cmd == '-'
+        let duration = g:QFixHowm_ReminderDefault_Reminder
+      elseif cmd == '+'
+        let duration = g:QFixHowm_ReminderDefault_Todo
+      elseif cmd == '~'
+        let duration = g:QFixHowm_ReminderDefault_UD
+      else
+        let duration = 0
+      endif
+    else
+      "@のオプションは0,1の継続期間が同じ
+      if cmd == '@'
+        if duration < 2
+          let duration = 1
+        endif
+      endif
+    endif
+    "-の継続期間は duration+1日
+    if cmd == '-'
+      let duration = duration + g:QFixHowm_ReminderOffset
+    endif
+    let d['duration'] = duration
+  endfor
+endfunction
+
+function! QFixHowmAddDate(date, param)
+  let day = QFixHowmDate2Int(a:date) + a:param
+  let sttime = (day - g:DateStrftime) * 24 * 60 * 60 + g:QFixHowm_ST * (60 * 60)
+  let str = strftime(s:hts_date, sttime)
+  return matchstr(str, s:sch_date)
+endfunction
+
+let loaded_HowmSchedule = 1
+
+" 予定・TODOのみ使用したい場合
+if exists('g:HowmSchedule_only') && g:HowmSchedule_only
+  finish
+endif
+
+""""""""""""""""""""""""""""""
 " QFixHowmファイル判定
 """"""""""""""""""""""""""""""
 "howmファイルの拡張子
@@ -2244,13 +2696,6 @@ function! QFixFtype(file)
   endif
 endfunction
 
-let loaded_HowmSchedule = 1
-
-" 予定・TODOのみ使用したい場合
-if exists('g:HowmSchedule_only') && g:HowmSchedule_only
-  finish
-endif
-
 "=============================================================================
 "    Description: howmバッファ関数
 "  Last Modified: 0000-00-00 00:00
@@ -2277,7 +2722,6 @@ endif
 if !exists('g:qfixtempname')
   let g:qfixtempname = tempname()
 endif
-let s:howmtempfile = g:qfixtempname
 
 "=============================================================================
 " キーマップ/メニュー登録
@@ -2450,10 +2894,6 @@ endif
 if !exists('g:QFixHowm_SplitMode')
   let g:QFixHowm_SplitMode = 0
 endif
-"タブで編集('tab'を設定)
-if !exists('QFixHowm_Edit')
-  let QFixHowm_Edit = ''
-endif
 "QFixHowmが自動生成するファイル
 if !exists('g:QFixHowm_GenerateFile')
   let g:QFixHowm_GenerateFile = '%Y-%m-%d-%H%M%S.'.g:QFixHowm_FileExt
@@ -2462,22 +2902,11 @@ endif
 if !exists('g:QFixHowm_DefaultSearchWord')
   let g:QFixHowm_DefaultSearchWord = 1
 endif
-"休日・祝日の予定もエクスポート対象にする
-if !exists('g:QFixHowmExportHoliday')
-  let g:QFixHowmExportHoliday = 0
-endif
 "ユーザアクションロックの最大数
 if !exists('g:QFixHowm_UserSwActionLockMax')
   let g:QFixHowm_UserSwActionLockMax = 64
 endif
 
-" come-from/goto link
-if !exists('howm_glink_pattern')
-  let howm_glink_pattern = '>>>'
-endif
-if !exists('howm_clink_pattern')
-  let howm_clink_pattern = '<<<'
-endif
 "howmリンクパターン
 if !exists('g:QFixHowm_Link')
   let g:QFixHowm_Link = '\('.g:howm_clink_pattern.'\|'.g:howm_glink_pattern.'\)'
@@ -2507,7 +2936,7 @@ augroup QFixHowm
   exec "autocmd FileType ".g:QFixHowm_FileType." call <SID>SetbuflocalSettings()"
   autocmd BufWinEnter quickfix call <SID>QFixHowmBufWinEnter()
   autocmd VimEnter   * call QFixHowmVimEnter()
-  autocmd VimLeave   * silent! call delete(s:uricmdfile)
+  autocmd VimLeave   * call QFixHowmVimLeave()
 augroup END
 
 "起動時コマンド出力ファイル名
@@ -2523,11 +2952,23 @@ if !exists('g:QFixHowm_VimEnterTime')
   let g:QFixHowm_VimEnterTime='07:00'
 endif
 
+function! QFixHowmVimLeave()
+  if exists('s:uricmdfile')
+    call delete(s:uricmdfile)
+  endif
+endfunction
+
 function! QFixHowmVimEnter()
-  call QFixHowmSetup()
+  if exists('g:QFixMRU_RegisterFile') && g:QFixMRU_RegisterFile == ''
+    let g:QFixMRU_RegisterFile = '\.\(howm\|txt\|mkd\|wiki\)$'
+  endif
+  if exists('g:QFixMRU_Title') && g:QFixMRU_Title == {}
+    let g:QFixMRU_Title = {'mkd' : '^#',  'wiki' : '^='}
+  endif
   if exists("*QFixHowmKeymapPost")
     call QFixHowmKeymapPost(s:QFixHowm_Key)
   endif
+  call QFixHowmSetup()
   if g:QFixHowm_VimEnterCmd == ''
     return
   endif
@@ -2562,14 +3003,30 @@ function! QFixHowmVimEnter()
   endif
 endfunction
 
-function! QFixHowmSetup()
+silent! function QFixHowmSetup()
+  let l:QFixHowm_Title = escape(g:QFixHowm_Title, g:QFixHowm_EscapeTitle)
+  if g:QFixHowm_HowmMode == 0
+    if !has_key(g:QFixMRU_Title, g:QFixHowm_UserFileExt)
+      let g:QFixMRU_Title[g:QFixHowm_UserFileExt] = '^'.l:QFixHowm_Title.' '
+    endif
+  else
+    if !has_key(g:QFixMRU_Title, s:howmsuffix)
+      let g:QFixMRU_Title[s:howmsuffix]       = '^'.l:QFixHowm_Title.' '
+    endif
+    if !has_key(g:QFixMRU_Title, g:QFixHowm_FileExt)
+      let g:QFixMRU_Title[g:QFixHowm_FileExt] = '^'.l:QFixHowm_Title.' '
+    endif
+  endif
   let g:QFixHowm_RandomInit = 1
   let g:HowmHtml_basedir = g:howm_dir
   let g:QFixHowm_GenerateFile = fnamemodify(g:QFixHowm_GenerateFile, ':t:r')
+  if exists('g:QFixMRU_RegisterFile') && '.'.g:QFixHowm_FileExt !~ g:QFixMRU_RegisterFile
+    let g:QFixMRU_RegisterFile = '\.\(howm\|'.g:QFixHowm_FileExt.'\)$'
+  endif
   " デフォルトで .howm は有効にする
   augroup QFixHowmBuffer
     autocmd!
-    exec "autocmd BufRead,BufNewFile *.".s:howmsuffix." silent! call QFixHowmInit(1)"
+    exec "autocmd BufRead,BufNewFile *.".s:howmsuffix." silent! call QFixHowmInit()"
     exec "autocmd BufReadPost        *.".s:howmsuffix." silent! call QFixHowmBufReadPost_()"
     exec "autocmd BufEnter           *.".s:howmsuffix." call QFixHowmBufferBufEnter()"
     exec "autocmd BufEnter           *.".s:howmsuffix." setlocal filetype=".g:QFixHowm_FileType
@@ -2583,7 +3040,7 @@ function! QFixHowmSetup()
       exec "autocmd BufReadPost        *.".g:QFixHowm_UserFileExt." call QFixHowmBufReadPost_()"
       exec "autocmd BufEnter           *.".g:QFixHowm_UserFileExt." call QFixHowmBufferBufEnter()"
       exec "autocmd BufRead,BufNewFile *.".g:QFixHowm_UserFileExt." call <SID>SetbuflocalSettings()"
-      exec "autocmd BufWritePost       *.".g:QFixHowm_UserFileExt." call <SID>QFixHowmInit()"
+      exec "autocmd BufWritePost       *.".g:QFixHowm_UserFileExt." call QFixHowmInit()"
     augroup END
     return
   endif
@@ -2710,9 +3167,8 @@ function! s:QFixHowmBufWritePost_()
   if !IsQFixHowmFile('%')
     return
   endif
-  if getfsize(expand('%:p')) <= 0
+  if search('^.\+$', 'ncw') == 0
     call delete(expand('%:p'))
-    return
   endif
   call QFixHowmAddKeyword()
 endfunction
@@ -3054,159 +3510,6 @@ function! QFixHowmCmd_AT(mode) range
   let g:QFixMRU_Disable = 0
 endfunction
 
-""""""""""""""""""""""""""""""
-"Quickfixウィンドウの定義部分を取り出す
-function! QFixHowmCmd_ScheduleList(...) range
-  if !exists("*QFixHowmExportSchedule")
-    return
-  endif
-  let prevPath = escape(getcwd(), ' ')
-
-  let firstline = 1
-  let cnt = line('$')
-  if a:firstline != a:lastline || a:0 > 0
-    let cnt = a:lastline - a:firstline + 1
-    let firstline = a:firstline
-  endif
-
-  let schlist = []
-  let l:QFixHowm_Title = '\d\+| '.s:sch_dateT.s:sch_Ext
-  let save_cursor = getpos('.')
-  for n in range(cnt)
-    call cursor(firstline+n, 1)
-    let qfline = getline('.')
-    if qfline !~ l:QFixHowm_Title
-      continue
-    endif
-    let holiday = g:QFixHowm_ReminderHolidayName
-    if exists('g:QFixHowm_UserHolidayName')
-      let holiday = g:QFixHowm_ReminderHolidayName . '\|' .g:QFixHowm_UserHolidayName
-    endif
-    let hdreg = '^'.s:sch_dateTime .'@ '.g:QFixHowm_DayOfWeekReg.' \?'.'\('.holiday.'\)'
-    if qfline =~ holiday && g:QFixHowmExportHoliday == 0
-      continue
-    endif
-    let file = QFixGet('file')
-    let lnum = QFixGet('lnum')
-    let ddat = {"qffile": file, "qflnum": lnum, "qfline": qfline}
-    call add(schlist, ddat)
-  endfor
-  call setpos('.', save_cursor)
-
-  QFixCclose
-  let h = g:QFix_Height
-  silent! exec 'split '
-  silent! exec 'silent! edit '.s:howmtempfile
-  setlocal buftype=nofile
-  setlocal noswapfile
-  setlocal bufhidden=hide
-  setlocal nobuflisted
-  for d in schlist
-    call s:QFixHowmMakeScheduleList(d)
-  endfor
-  silent! exec 'silent! edit '.s:howmtempfile
-  setlocal buftype=nofile
-  silent! bd!
-  let g:QFix_Height = h
-  if schlist != []
-    call s:QFixHowmParseScheduleList(schlist)
-    call QFixHowmExportSchedule(schlist)
-  else
-    QFixCopen
-  endif
-  return schlist
-endfunction
-
-function! s:QFixHowmMakeScheduleList(sdic)
-  setlocal modifiable
-  silent! %delete _
-  let file = a:sdic['qffile']
-  let lnum = a:sdic['qflnum']
-  let tmpfile = escape(file, ' #%')
-  if g:QFixHowm_ForceEncoding
-    silent! exec '0read ++enc='.g:howm_fileencoding.' ++ff='.g:howm_fileformat.' '.tmpfile
-  else
-    silent! exec '0read '.tmpfile
-  endif
-  silent! $delete _
-  call cursor(lnum,1)
-  let a:sdic['orgline'] = getline(lnum)
-
-  let head = QFixHowmGetTitleSearchRegxp()
-
-  let start = lnum+1
-  let end   = search(head, 'nW')-1
-  if end == -1
-    let end = line('$')
-  endif
-  let a:sdic['Description'] = getline(start, end)
-  return a:sdic['Description']
-endfunction
-
-function! s:QFixHowmParseScheduleList(sdic)
-  for d in a:sdic
-    let pattern = '.*'.s:sch_dateT.s:sch_Ext.'\d*\s*'.g:QFixHowm_DayOfWeekReg.'\?\s*'
-    let d['Summary'] = substitute(d['qfline'], pattern, '', '')
-    let pattern = '\['.s:sch_date
-    let d['StartDate'] = strpart(matchstr(d['qfline'], pattern), 1)
-    let d['StartDate'] = substitute(d['StartDate'], '[/]', '-', 'g')
-    let pattern = '\['.s:sch_date . ' '. s:sch_time
-    let d['StartTime'] = strpart(matchstr(d['qfline'], pattern), 12)
-    let pattern = '&\['.s:sch_date
-    let d['EndDate'] = strpart(matchstr(d['orgline'], pattern), 2)
-    let d['EndDate'] = substitute(d['EndDate'], '[/]', '-', 'g')
-    let pattern = '&\['.s:sch_date.' '. s:sch_time
-    let d['EndTime'] = strpart(matchstr(d['orgline'], pattern), 13)
-    if d['EndTime'] == ''
-      let d['EndDate'] = QFixHowmAddDate(d['EndDate'], g:QFixHowm_EndDateOffset)
-    endif
-
-    let pattern = s:sch_dateCmd
-    let d['define']  = strpart(matchstr(d['orgline'], pattern), 0)
-    let pattern = ']'.s:sch_cmd
-    let d['command'] = strpart(matchstr(d['orgline'], pattern), 1)
-    let d['duration'] = matchstr(d['command'], '\d\+$')
-
-    let duration = d['duration']
-    let cmd = d['command'][0]
-    if duration == ''
-      if cmd == '@'
-        "@のデフォルトオプションは表示だけに関係する
-        let duration = 1
-      elseif cmd == '!'
-        let duration = g:QFixHowm_ReminderDefault_Deadline
-      elseif cmd == '-'
-        let duration = g:QFixHowm_ReminderDefault_Reminder
-      elseif cmd == '+'
-        let duration = g:QFixHowm_ReminderDefault_Todo
-      elseif cmd == '~'
-        let duration = g:QFixHowm_ReminderDefault_UD
-      else
-        let duration = 0
-      endif
-    else
-      "@のオプションは0,1の継続期間が同じ
-      if cmd == '@'
-        if duration < 2
-          let duration = 1
-        endif
-      endif
-    endif
-    "-の継続期間は duration+1日
-    if cmd == '-'
-      let duration = duration + g:QFixHowm_ReminderOffset
-    endif
-    let d['duration'] = duration
-  endfor
-endfunction
-
-function! QFixHowmAddDate(date, param)
-  let day = QFixHowmDate2Int(a:date) + a:param
-  let sttime = (day - g:DateStrftime) * 24 * 60 * 60 + g:QFixHowm_ST * (60 * 60)
-  let str = strftime(s:hts_date, sttime)
-  return matchstr(str, s:sch_date)
-endfunction
-
 "=============================================================================
 " MRU
 "=============================================================================
@@ -3224,13 +3527,7 @@ function! QFixHowmInitMru(mode)
   if s:mruprg || a:mode
     return
   endif
-  let l:QFixHowm_Title = escape(g:QFixHowm_Title, g:QFixHowm_EscapeTitle)
-  if !has_key(g:QFixMRU_Title, s:howmsuffix)
-    let g:QFixMRU_Title[s:howmsuffix]       = '^'.l:QFixHowm_Title.' '
-  endif
-  if !has_key(g:QFixMRU_Title, g:QFixHowm_FileExt)
-    let g:QFixMRU_Title[g:QFixHowm_FileExt] = '^'.l:QFixHowm_Title.' '
-  endif
+  call QFixHowmSetup()
   if g:QFixMRU_state == 0
     let file = g:QFixMRU_Filename
     let dir = g:howm_dir
@@ -3292,257 +3589,6 @@ silent! function QFixHowmSaveMru(...)
 endfunction
 
 "=============================================================================
-" アクションロック
-"=============================================================================
-"日付のデフォルトアクションロック
-if !exists('g:QFixHowm_DateActionLockDefault')
-  let g:QFixHowm_DateActionLockDefault = 1
-endif
-"リストアクションロック
-if exists('g:QFixHowmSwitchListActionLock')
-  "SwitchListActionLockのドキュメントミス対応
-  let g:QFixHowm_SwitchListActionLock = g:QFixHowmSwitchListActionLock
-endif
-if !exists('g:QFixHowm_SwitchListActionLock')
-  let g:QFixHowm_SwitchListActionLock = ['{ }', '{*}', '{-}']
-endif
-"ユーザーマクロアクションロックの識別子
-if !exists('g:QFixHowm_MacroActionPattern')
-  let g:QFixHowm_MacroActionPattern = '<|>'
-endif
-"ユーザーマクロアクションのキーマップ
-if !exists('g:QFixHowm_MacroActionKey')
-  let g:QFixHowm_MacroActionKey = 'M'
-endif
-let s:QFixHowmALSPat = ''
-
-"アクションロック用ハイライト
-let g:QFixHowm_keyword = ''
-function! QFixHowmHighlight()
-  if !IsQFixHowmFile('%')
-    return
-  endif
-  if &syntax == ''
-    return
-  endif
-  silent! syntax clear actionlockKeyword
-  if g:QFixHowm_keyword != ''
-    exe 'syntax match actionlockKeyword display "\V'.g:QFixHowm_keyword.'"'
-  endif
-endfunction
-
-"アクションロック実行
-"TODO:strを取得しない形に修正する
-function! QFixHowmActionLock()
-  let RegisterBackup = [@0, @1, @2, @3, @4, @5, @6, @7, @8, @9, @/, @", @"]
-  if has('gui_running')
-    silent! let RegisterBackup[12] = @*
-  endif
-  let s:QFixHowmMA = 0
-  let str = QFixHowmActionLockStr()
-  if s:QFixHowmMA
-    exec 'normal '. str
-  elseif str == "\<CR>"
-    silent exec "normal! \<CR>"
-  elseif str == "\<ESC>"
-  else
-    let str = substitute(str, "\<CR>", "|", "g")
-    let str = substitute(str, "|$", "", "")
-    silent exec str
-  endif
-  for n in range(10)
-    silent! exec 'let @'.n.'=RegisterBackup['.n.']'
-  endfor
-  let @/ = RegisterBackup[10]
-  let @" = RegisterBackup[11]
-  if has('gui_running')
-    silent! let @* = RegisterBackup[12]
-  endif
-  return
-endfunction
-
-function! QFixHowmActionLockStr()
-  let save_cursor = getpos('.')
-  call setpos('.', save_cursor)
-  let ret = QFixHowmMacroAction()
-  if ret != "\<CR>"
-    let s:QFixHowmMA = 1
-    return ret
-  endif
-  call setpos('.', save_cursor)
-  let ret = QFixHowmOpenCursorline()
-  if ret == 1
-    return "\<ESC>"
-  elseif ret == -1
-    let glink = g:howm_glink_pattern
-    let file = matchstr(getline('.'), glink.'.*$', '', '')
-    let file = substitute(file, glink.'\s*', '', '')
-    if filereadable(expand(file))
-      let file = escape(file, '\')
-      return ":exec 'call QFixHowmEditFile(\"".file."\")'\<CR>"
-      return "\<ESC>"
-    endif
-    silent exec 'normal! gf'
-    return "\<ESC>"
-  endif
-  call setpos('.', save_cursor)
-  let text = getline('.')
-  let stridx = match(text, g:QFixHowm_Link)
-  if stridx > -1 && col('.') > stridx
-    let pattern = matchstr(text, g:QFixHowm_Link.'\s*.*$')
-    let pattern = substitute(pattern, '^'.g:QFixHowm_Link.'\s*', '', '')
-    let s:QFixHowmALSPat = pattern
-    call QFixHowmActionLockSearch(0)
-    return "\<ESC>"
-  endif
-  call setpos('.', save_cursor)
-  let ret = QFixHowmDateActionLock()
-  if ret != "\<CR>"
-    return ret
-  endif
-  call setpos('.', save_cursor)
-  let ret = QFixHowmTimeActionLock()
-  if ret != "\<CR>"
-    return ret
-  endif
-  call setpos('.', save_cursor)
-  if col('.') < 36 && getline('.') =~ '^'.s:sch_dateT.s:sch_Ext
-    let ret = QFixHowmSwitchActionLock(g:QFixHowm_ScheduleSwActionLock, 1)
-    if ret != "\<CR>"
-      return ret
-    endif
-  endif
-  call setpos('.', save_cursor)
-  let ret = QFixHowmRepeatDateActionLock()
-  if ret != "\<CR>"
-    return ret
-  endif
-  call setpos('.', save_cursor)
-  let ret = QFixHowmKeywordLinkSearch()
-  if ret != "\<CR>"
-    return ret
-  endif
-  call setpos('.', save_cursor)
-  let ret = QFixHowmSwitchActionLock(g:QFixHowm_SwitchListActionLock)
-  if ret != "\<CR>"
-    return ret
-  endif
-  call setpos('.', save_cursor)
-  let ret = QFixHowmSwitchActionLock(['{_}'])
-  if ret != "\<CR>"
-    return ret
-  endif
-  call setpos('.', save_cursor)
-  if exists('g:QFixHowm_UserSwActionLock')
-    let ret = QFixHowmSwitchActionLock(g:QFixHowm_UserSwActionLock)
-    if ret != "\<CR>"
-      return ret
-    endif
-  endif
-  call setpos('.', save_cursor)
-
-  for i in range(2, g:QFixHowm_UserSwActionLockMax)
-    if !exists('g:QFixHowm_UserSwActionLock'.i)
-      continue
-    endif
-    call setpos('.', save_cursor)
-    exec 'let action = '.'g:QFixHowm_UserSwActionLock'.i
-    if action != []
-      let ret = QFixHowmSwitchActionLock(action)
-      if ret != "\<CR>"
-        return ret
-      endif
-    endif
-  endfor
-  call setpos('.', save_cursor)
-  if getline('.') =~ '^'.s:sch_dateT.s:sch_Ext
-    call cursor('.', 1)
-    let ret = QFixHowmRepeatDateActionLock()
-    if ret != "\<CR>"
-      return ret
-    endif
-  endif
-  call setpos('.', save_cursor)
-  return "\<CR>"
-endfunction
-
-"Wikiスタイルリンクの扱い
-if !exists('g:QFixHowm_Wiki')
-  let g:QFixHowm_Wiki = 0
-endif
-"キーワードリンク検索
-function! QFixHowmKeywordLinkSearch()
-  let save_cursor = getpos('.')
-  let l:QFixHowm_keyword = g:QFixHowm_keyword
-  let col = col('.')
-  let lstr = getline('.')
-
-  for word in g:QFixHowm_KeywordList
-    let len = strlen(word)
-    let pos = match(lstr, '\V'.word)
-    if pos == -1 || col < pos+1
-      continue
-    endif
-    let str = strpart(lstr, col-len, 2*len)
-    if matchstr(str, '\V'.word) == word
-      let s:QFixHowmALSPat = word
-      if g:QFixHowm_Wiki > 0
-        let link = word
-        if g:QFixHowm_Wiki == 1
-          let file = g:howm_dir
-          if exists('g:QFixHowm_WikiDir')
-            let file = g:howm_dir . '/'.g:QFixHowm_WikiDir
-          endif
-          let file = file .'/'.link.'.'.g:QFixHowm_FileExt
-          call QFixEditFile(file)
-        elseif g:QFixHowm_Wiki == 2
-          let cmd = ':e '
-          let subdir = vimwiki#current_subdir()
-          call vimwiki#open_link(cmd, subdir.link)
-        endif
-        return "\<ESC>"
-      endif
-      call QFixHowmActionLockSearch(0)
-      return "\<ESC>"
-    endif
-  endfor
-  return "\<CR>"
-endfunction
-
-"アクションロック用サーチ
-function! QFixHowmActionLockSearch(regmode, ...)
-  let g:MyGrep_Regexp = a:regmode
-  let pattern = s:QFixHowmALSPat
-  if a:0 > 0
-    let pattern = input(a:1, pattern)
-  endif
-  if pattern == ''
-    return "\<CR>"
-  endif
-  call histadd('@', pattern)
-  call QFixHowmListAll(pattern, 0)
-endfunction
-
-"ユーザーマクロのアクションロック
-let s:QFixHowm_MacroActionCmd = ''
-function! QFixHowmMacroAction()
-  if g:QFixHowm_MacroActionKey == '' || g:QFixHowm_MacroActionPattern == ''
-    return "\<CR>"
-  endif
-  if expand('%:t') !~ g:QFixHowm_Menufile
-    " return "\<CR>"
-  endif
-  let text = getline('.')
-  if text !~ g:QFixHowm_MacroActionPattern
-    return "\<CR>"
-  endif
-  let text = substitute(text, '.*'.g:QFixHowm_MacroActionPattern, "", "")
-  let s:QFixHowm_MacroActionCmd = text
-  exec "nmap <silent> " . s:QFixHowm_Key . g:QFixHowm_MacroActionKey . " " . ":<C-u>:QFixCclose<CR>" .substitute(s:QFixHowm_MacroActionCmd, '^\s*', '', '')
-  return s:QFixHowm_Key . g:QFixHowm_MacroActionKey
-endfunction
-
-"=============================================================================
 "QFixHowmコマンド
 "=============================================================================
 "バッファローカル設定
@@ -3562,9 +3608,9 @@ function! s:SetbuflocalSettings()
     setlocal nofoldenable
     setlocal foldmethod=expr
     if g:QFixHowm_WildCardChapter
-      setlocal foldexpr=QFixHowmFoldingLevel(v:lnum)
+      setlocal foldexpr=QFixHowmFoldingLevelWCC(v:lnum)
     else
-      exec "setlocal foldexpr=getline(v:lnum)=~'".g:QFixHowm_FoldingPattern."'?'>1':'1'"
+      setlocal foldexpr=QFixHowmFoldingLevel(v:lnum)
     endif
   endif
   call QFixHowmHighlight()
@@ -3586,10 +3632,12 @@ endfunction
 
 function! QFixHowmBufLocalSave()
   let g:QFixHowm_WriteUpdateTime = 0
+  let saved_bt = &buftype
   if &buftype == 'nofile'
     setlocal buftype=
   endif
   write!
+  let &buftype = saved_bt
 endfunction
 
 function! QFixHowmDivideEntry() range
@@ -3613,7 +3661,6 @@ function! QFixHowmDivideEntry() range
     let fline = lline + 1
     call cursor(fline, 1)
     let [text, fline, lline] = QFixMRUGet('entry', '%', fline)
-    echo text
   endwhile
   let last = lline
   exec first.','.last.'delete _'
@@ -3688,7 +3735,8 @@ if !exists('g:QFixHowm_DiaryFile')
 endif
 "日記検索対象指定
 if !exists('g:QFixHowm_SearchDiaryFile')
-  let g:QFixHowm_SearchDiaryFile = '**/*/[12]*-000000.*'
+  " let g:QFixHowm_SearchDiaryFile = '**/*/[12]*-000000.*'
+  let g:QFixHowm_SearchDiaryFile = '**/*[12]*-000000.*'
 endif
 "日記検索高速表示
 if !exists('g:QFixHowm_SearchDiaryMode')
@@ -3808,7 +3856,11 @@ function! QFixHowmInsertEntry(cmd, ...)
   if len(QFixHowm_Template) == 0
     return 1
   endif
-  call add(QFixHowm_Template, "")
+  let QFixHowm_Cmd_NewEntry = g:QFixHowm_Cmd_NewEntry
+  if exists('g:QFixHowm_Cmd_NewEntry_'.ext)
+    exec 'let QFixHowm_Cmd_NewEntry = ' . 'g:QFixHowm_Cmd_NewEntry_'.ext
+  endif
+
   call map(QFixHowm_Template, 'substitute(v:val, "%TITLE%", g:QFixHowm_Title, "g")')
   let tag = g:QFixHowm_DefaultTag == '' ? '' : g:QFixHowm_DefaultTag . ' '
   call map(QFixHowm_Template, 'substitute(v:val, "%TAG%", tag, "g")')
@@ -3816,53 +3868,68 @@ function! QFixHowmInsertEntry(cmd, ...)
   call map(QFixHowm_Template, 'substitute(v:val, "%DATE%", date, "g")')
   call map(QFixHowm_Template, 'substitute(v:val, "%LASTFILENAME%", g:QFixHowm_LastFilename, "g")')
   call map(QFixHowm_Template, 'strftime(v:val)')
-  if a:cmd == 'New'
-    silent! call setline(1, QFixHowm_Template)
-    $delete _
+  let cmd = a:cmd
+  let tmpl = deepcopy(QFixHowm_Template)
+  if cmd == 'New'
+    silent! call setline(1, tmpl)
     call cursor(1, 1)
   endif
+  let tmpl = s:patch73_272(tmpl)
   let nl = ""
-  let len = len(QFixHowm_Template)
+  let len = len(tmpl)
   let l = line('.')
-  if a:cmd =~ 'next'
+  if cmd =~ 'next'
     if getline(line('.')) != ''
       silent! put=nl
     endif
-    silent! put=QFixHowm_Template
-    call cursor(line('.')-len+2, 1)
-  elseif a:cmd == 'prev'
-    silent! -1put=QFixHowm_Template
-    call cursor(line('.')-len+2, 1)
-  elseif a:cmd == 'top'
-    silent! -1put=QFixHowm_Template
+    silent! put=tmpl
+    call cursor(l+1, 1)
+  elseif cmd == 'prev'
+    silent! -1put=tmpl
+    call cursor(l, 1)
+  elseif cmd == 'top'
+    silent! -1put=tmpl
     call cursor(1, 1)
-  elseif a:cmd == 'bottom'
+  elseif cmd == 'bottom'
     if getline(line('$')) != ''
       silent! put=nl
     endif
-    silent! $put=QFixHowm_Template
-    call cursor(line('.')-len+2, 1)
+    silent! $put=tmpl
+    call cursor(l+1, 1)
   endif
-  let cmd = g:QFixHowm_Cmd_NewEntry
   let saved_ve = &virtualedit
   silent setlocal virtualedit+=onemore
-  silent! exec 'normal! '. cmd
-  if cmd =~ '\CA$'
+  let keycmd = QFixHowm_Cmd_NewEntry
+  silent! exec 'normal! '. keycmd
+  if keycmd =~ '\CA$'
     exec 'normal! l'
     startinsert!
-  elseif cmd =~ '\Ca$'
+  elseif keycmd =~ '\Ca$'
     exec 'normal! l'
     startinsert
-  elseif cmd =~ '\CI$'
+  elseif keycmd =~ '\CI$'
     exec 'normal! ^'
     startinsert
-  elseif cmd =~ '\Ci$'
+  elseif keycmd =~ '\Ci$'
     startinsert
   endif
   silent exec 'setlocal virtualedit='.saved_ve
   return 0
 endfunction
 
+" Vim 7.3patch272の:put=listバグ修正による挙動の違いを吸収する
+" 7.3.272  ":put =list" does not add empty line for trailing empty item
+if !exists('qfixmemo_patch73_272')
+  let qfixmemo_patch73_272 = v:version > 703 || (v:version == 703 && has('patch272'))
+endif
+function! s:patch73_272(list)
+  if g:qfixmemo_patch73_272
+    return a:list
+  endif
+  let list = deepcopy(a:list)
+  call add(list, "")
+  return list
+endfunction
 function! QFixHowmReadfile(file)
   let mfile = fnamemodify(a:file, ':p')
   if bufloaded(mfile) "バッファが存在する場合
@@ -4143,6 +4210,7 @@ function! QFixHowmRandomWalk(...)
     return result
   endif
   QFixCopen
+  redraw|echo ''
 endfunction
 
 "ランダムウォークリスト作成
@@ -4608,7 +4676,6 @@ function! QFixHowmSort(cmd, days, ...)
       let save_qflist = sort(save_qflist, "QFixHowmCompareTime")
     else
       let save_qflist = sort(save_qflist, "QFixCompareText")
-      let save_qflist = reverse(save_qflist)
     endif
     let g:QFix_Sort = 'mtime'
   elseif cmd == 'text'
@@ -4740,6 +4807,7 @@ function! QFixHowmListRecent(pattern, ...)
     let g:QFixHowm_RecentDays = count
   endif
   let days = g:QFixHowm_RecentDays
+
   let pattern = a:pattern
   let s:UseTitleFilter = 1
   let mtime_mode = 0
@@ -4748,6 +4816,11 @@ function! QFixHowmListRecent(pattern, ...)
   endif
   if g:QFixHowm_HowmMode == 0
     let mtime_mode = 1
+  endif
+  " findstrでタイムスタンプ検索
+  if a:0
+    call QFixHowmTimeStampSearch()
+    return
   endif
   if a:0
     let mtime_mode = !mtime_mode
@@ -5084,6 +5157,7 @@ function! QFixHowmLoadKeyword()
       let keyword = escape(keyword, '<>\')
       let g:QFixHowm_keyword = g:QFixHowm_keyword.'\<'.keyword.'\>\|'
     else
+      let keyword = escape(keyword, '\')
       let g:QFixHowm_keyword = g:QFixHowm_keyword.''.keyword.'\|'
     endif
     let g:howm_keyword = g:howm_keyword.''.keyword.'\|'
@@ -5162,6 +5236,10 @@ function! QFixHowmAddKeyword()
   call QFixHowmLoadKeyword()
   call QFixHowmHighlight()
   call setpos('.', save_cursor)
+endfunction
+
+function! QFixHowmGetKeyword()
+  return g:QFixHowm_KeywordList
 endfunction
 
 "QFixHowm_keywordfileを再作成
@@ -5354,8 +5432,12 @@ silent! function QFixHowmOutline()
 endfunction
 
 "フォールディングレベル計算
-let s:schepat = '^\s*'.s:sch_dateT.s:sch_Ext
 silent! function QFixHowmFoldingLevel(lnum)
+  return getline(a:lnum) =~ g:QFixHowm_FoldingPattern ? '>1' : '1'
+endfunction
+
+let s:schepat = '^\s*'.s:sch_dateT.s:sch_Ext
+silent! function QFixHowmFoldingLevelWCC(lnum)
   let s:titlepat = '^'.escape(g:QFixHowm_Title, g:QFixHowm_EscapeTitle).'\([^'.g:QFixHowm_Title.']\|$\)'
   let text = getline(a:lnum)
   if text =~ s:titlepat || text =~ s:schepat
@@ -5797,3 +5879,94 @@ function! s:GetChanges(amode)
   call setpos('.', save_cursor)
 endfunction
 
+function! QFixHowmTimeStampSearch()
+  let findstr = (g:mygrepprg == '') + (g:mygrepprg == 'findstr') + (a:0)
+  if findstr
+    let fmt = '['. g:QFixHowm_DatePattern
+  else
+    let fmt = '['. g:QFixHowm_DatePattern
+  endif
+  let days = g:QFixHowm_RecentDays
+  let fmt = substitute(fmt, ' .*$', '', '')
+  if exists('g:qfixmemo_timeformat_findstr')
+    let fmt = g:qfixmemo_timeformat_findstr
+  endif
+
+  let fmt = '^' . escape(fmt, '[~*.#')
+  let fmt = substitute(fmt, '\C%H', '[0-2][0-9]', 'g')
+  let fmt = substitute(fmt, '\C%M', '[0-5][0-9]', 'g')
+  let fmt = substitute(fmt, '\C%S', '[0-5][0-9]', 'g')
+
+  let tregxp = ''
+  let ltime = localtime()
+  for n in range(days)
+    let year  = strftime('%Y', ltime)
+    let month = strftime('%m', ltime)
+    let day   = strftime('%d', ltime)
+
+    let regxp = fmt
+    let regxp = substitute(regxp, '\C%Y', year, 'g')
+    let regxp = substitute(regxp, '\C%m', month, 'g')
+    let regxp = substitute(regxp, '\C%d', day, 'g')
+
+    let tregxp = tregxp . printf('|%s', regxp)
+    let ltime -= 24*60*60
+  endfor
+  let tregxp = substitute(tregxp, '^|', '', '')
+  let fmt = substitute(fmt, '\C%Y', '[0-2][0-9][0-9][0-9]', 'g')
+  let fmt = substitute(fmt, '\C%m', '[0-1][0-9]', 'g')
+  let fmt = substitute(fmt, '\C%d', '[0-3][0-9]', 'g')
+  let fmt = fmt . '\([^'.s:sch_ext.']\|$\)'
+
+  if findstr
+    let saved_grepprg = &grepprg
+    let tregxp = '"'.substitute(tregxp, '|', ' ', 'g').'"'
+    let prevPath = escape(getcwd(), ' ')
+    exe 'lchdir ' . expand(g:howm_dir)
+    let cmd = 'grep! /n /p /r /s ' . tregxp . ' *.*'
+    redraw | echo 'QFixHowm : (findstr) Searching...'
+    silent! exe cmd
+    silent! exec 'lchdir ' . prevPath
+    let &grepprg = saved_grepprg
+  else
+    let l:SearchFile = '**/*.*'
+    let searchPath = g:howm_dir
+    silent! let l:SearchFile = g:QFixHowm_SearchHowmFile
+    call MyGrep(tregxp, searchPath, l:SearchFile, g:howm_fileencoding, 0)
+  endif
+  let qflist = QFixSort('rtext')
+  call filter(qflist, "v:val['text'] =~ '" . fmt . "'")
+  " FIXME: 内部エンコーディングが utf-8 だと日本語ファイル名が処理できない
+  for idx in range(len(qflist))
+    let file = bufname(qflist[idx]['bufnr'])
+    let file = substitute(fnamemodify(file, ':p'), '\\', '/', 'g')
+    let qflist[idx]['filename'] = file
+  endfor
+
+  redraw | echo 'QFixHowm : Add summary...'
+  let l:QFixHowm_Title = escape(g:QFixHowm_Title, g:QFixHowm_EscapeTitle)
+  let tpattern = '^'.l:QFixHowm_Title. '\([^'.g:QFixHowm_Title[0].']\+\|\s*$\)'
+  let idx = 0
+  for d in qflist
+    let file = d['filename']
+    let lnum = d['lnum']
+    let [entry, flnum, llnum] = QFixMRUGet('entry', file, lnum, tpattern)
+    " echoe "List=".string(entry)
+    if len(entry) == 0
+      call remove(qflist, idx)
+      continue
+    endif
+    let qflist[idx]['text'] = entry[0]
+    let idx += 1
+  endfor
+  if len(qflist) == 0
+    echohl ErrorMsg
+    redraw | echo 'QFixHowm : Nothing in list!'
+    echohl None
+    return
+  endif
+  redraw | echo 'QFixHowm : Done.'
+  let g:QFix_SearchPath = g:howm_dir
+  call QFixSetqflist(qflist)
+  QFixCopen
+endfunction
