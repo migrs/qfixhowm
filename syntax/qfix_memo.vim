@@ -164,5 +164,5 @@ hi link WikiDelConceal    WikiIgnore
 hi link WikiSuperConceal  WikiIgnore
 hi link WikiSubConceal    WikiIgnore
 
-runtime! syntax/howm_memo.vim
+" runtime! syntax/howm_memo.vim
 
